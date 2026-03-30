@@ -117,7 +117,7 @@ void main() {
     expect(fourTileController.state.remainingTimeMs, 32000);
   });
 
-  test('shows a hint after 8 seconds without clearing', () {
+  test('shows a hint after 5 seconds without clearing', () {
     fakeAsync((async) {
       final controller = GameSessionController(
         engine: _FakeClearEngine(clearedTiles: 3),
@@ -128,7 +128,7 @@ void main() {
       addTearDown(controller.dispose);
 
       controller.startNewGame();
-      async.elapse(const Duration(seconds: 8));
+      async.elapse(const Duration(seconds: 5));
 
       expect(controller.state.activeHint, isNotNull);
       expect(controller.state.activeHint!.move.type, MoveType.swapRow);
@@ -148,13 +148,13 @@ void main() {
       addTearDown(controller.dispose);
 
       controller.startNewGame();
-      async.elapse(const Duration(seconds: 8));
+      async.elapse(const Duration(seconds: 5));
       expect(controller.state.activeHint, isNotNull);
 
       controller.noteInteraction();
       expect(controller.state.activeHint, isNull);
 
-      async.elapse(const Duration(seconds: 7));
+      async.elapse(const Duration(seconds: 4));
       expect(controller.state.activeHint, isNull);
 
       async.elapse(const Duration(seconds: 1));

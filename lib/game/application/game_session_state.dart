@@ -5,7 +5,7 @@ enum GamePhase { title, playing, resolving, result }
 enum RunEndReason { noMoreMoves, timeUp }
 
 const kInitialRunTimeMs = 30000;
-const kHintDelayMs = 8000;
+const kHintDelayMs = 5000;
 
 const _unset = Object();
 
