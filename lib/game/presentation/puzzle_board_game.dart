@@ -23,6 +23,7 @@ class PuzzleBoardGame extends FlameGame {
   final ValueListenable<BoardDragPreview?> dragPreview;
   final Map<int, _TileVisual> _visuals = {};
   BoardMatrix _currentBoard;
+  final List<_ChainCalloutVisual> _callouts = [];
   BoardHint? _hint;
   double _hintElapsed = 0;
   StreamSubscription<BoardAnimationEvent>? _subscription;
@@ -55,6 +56,10 @@ class PuzzleBoardGame extends FlameGame {
 
     for (final id in toRemove) {
       _visuals.remove(id);
+    }
+    _callouts.removeWhere((callout) => callout.isFinished);
+    for (final callout in _callouts) {
+      callout.update(dt);
     }
   }
 
@@ -89,6 +94,7 @@ class PuzzleBoardGame extends FlameGame {
       }
       _renderTile(canvas, geometry, visual, preview: preview, hint: _hint);
     }
+    _renderCallouts(canvas, geometry);
   }
 
   void setHint(BoardHint? hint) {
@@ -113,7 +119,12 @@ class PuzzleBoardGame extends FlameGame {
         );
         return;
       case BoardAnimationKind.clear:
-        _clearTiles(event.clearedTileIds, duration: event.duration);
+        _clearTiles(
+          event.clearedTileIds,
+          clearedPositions: event.clearedPositions,
+          chainIndex: event.chainIndex,
+          duration: event.duration,
+        );
         return;
     }
   }
@@ -121,6 +132,7 @@ class PuzzleBoardGame extends FlameGame {
   void _syncBoard(BoardMatrix board) {
     _currentBoard = cloneBoard(board);
     _visuals.clear();
+    _callouts.clear();
 
     for (var row = 0; row < kBoardSize; row++) {
       for (var column = 0; column < kBoardSize; column++) {
@@ -193,7 +205,12 @@ class PuzzleBoardGame extends FlameGame {
     _currentBoard = nextBoard;
   }
 
-  void _clearTiles(Set<int> tileIds, {required Duration duration}) {
+  void _clearTiles(
+    Set<int> tileIds, {
+    required Set<BoardPosition> clearedPositions,
+    required int chainIndex,
+    required Duration duration,
+  }) {
     for (final tileId in tileIds) {
       final visual = _visuals[tileId];
       if (visual == null) {
@@ -207,6 +224,15 @@ class PuzzleBoardGame extends FlameGame {
         scale: 0.16,
         opacity: 0,
         removeWhenFinished: true,
+      );
+    }
+
+    if (chainIndex > 1 && clearedPositions.isNotEmpty) {
+      _callouts.add(
+        _ChainCalloutVisual.fromChain(
+          chainIndex: chainIndex,
+          clearedPositions: clearedPositions,
+        ),
       );
     }
   }
@@ -329,6 +355,12 @@ class PuzzleBoardGame extends FlameGame {
     canvas.restore();
   }
 
+  void _renderCallouts(Canvas canvas, BoardGeometry geometry) {
+    for (final callout in _callouts) {
+      callout.render(canvas, geometry);
+    }
+  }
+
   Set<int> _activeTileIds(BoardDragPreview? preview) {
     if (preview == null) {
       return const <int>{};
@@ -436,6 +468,188 @@ class _HintTransform {
   final double dx;
   final double dy;
   final double scale;
+}
+
+class _ChainCalloutVisual {
+  _ChainCalloutVisual({
+    required this.anchorRow,
+    required this.anchorColumn,
+    required this.style,
+  });
+
+  factory _ChainCalloutVisual.fromChain({
+    required int chainIndex,
+    required Set<BoardPosition> clearedPositions,
+  }) {
+    final rows = clearedPositions.map((position) => position.row).toList();
+    final columns = clearedPositions
+        .map((position) => position.column)
+        .toList();
+    final minRow = rows.reduce(math.min).toDouble();
+    final averageColumn =
+        columns.reduce((left, right) => left + right) / columns.length;
+    final horizontalNudge = switch (chainIndex % 3) {
+      0 => -0.18,
+      1 => 0.18,
+      _ => 0.0,
+    };
+
+    return _ChainCalloutVisual(
+      anchorRow: (minRow - 0.52).clamp(0.1, kBoardSize - 1.2),
+      anchorColumn: (averageColumn + horizontalNudge).clamp(
+        0.2,
+        kBoardSize - 1.2,
+      ),
+      style: _ChainCalloutStyle.forChain(chainIndex),
+    );
+  }
+
+  static const _duration = 0.92;
+
+  final double anchorRow;
+  final double anchorColumn;
+  final _ChainCalloutStyle style;
+  double _elapsed = 0;
+
+  bool get isFinished => _elapsed >= _duration;
+
+  void update(double dt) {
+    _elapsed += dt;
+  }
+
+  void render(Canvas canvas, BoardGeometry geometry) {
+    final progress = (_elapsed / _duration).clamp(0.0, 1.0);
+    final pop = Curves.easeOutBack.transform((progress / 0.36).clamp(0.0, 1.0));
+    final lift =
+        Curves.easeOutCubic.transform(progress) * geometry.cellSize * 0.42;
+    final fade = progress < 0.72 ? 1.0 : 1 - ((progress - 0.72) / 0.28);
+    final scale = ui.lerpDouble(0.72, 1.0, pop) ?? 1.0;
+    final center = Offset(
+      geometry.boardRect.left + ((anchorColumn + 0.5) * geometry.cellSize),
+      geometry.boardRect.top + ((anchorRow + 0.5) * geometry.cellSize) - lift,
+    );
+
+    final textStyle = TextStyle(
+      fontSize: geometry.cellSize * 0.24,
+      fontWeight: FontWeight.w900,
+      letterSpacing: 0.4,
+      foreground: Paint()
+        ..shader = ui.Gradient.linear(
+          Offset.zero,
+          Offset(geometry.cellSize * 2.4, geometry.cellSize),
+          [
+            for (final color in style.gradientColors)
+              color.withValues(alpha: fade.clamp(0.0, 1.0)),
+          ],
+        ),
+      shadows: [
+        Shadow(
+          color: style.shadowColor.withValues(alpha: fade * 0.5),
+          blurRadius: 12,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    );
+    final painter = TextPainter(
+      text: TextSpan(text: style.label, style: textStyle),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    )..layout();
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(scale, scale);
+    canvas.translate(-painter.width / 2, -painter.height / 2);
+
+    final chipRect = Rect.fromLTWH(
+      -10,
+      -4,
+      painter.width + 20,
+      painter.height + 8,
+    );
+    final chipPaint = Paint()
+      ..color = style.backdropColor.withValues(alpha: fade * 0.18);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chipRect, const Radius.circular(999)),
+      chipPaint,
+    );
+
+    final sparklePaint = Paint()
+      ..color = style.sparkleColor.withValues(alpha: fade * 0.85);
+    canvas.drawCircle(Offset(0, painter.height * 0.16), 2.2, sparklePaint);
+    canvas.drawCircle(
+      Offset(chipRect.right - 4, painter.height * 0.62),
+      1.8,
+      sparklePaint,
+    );
+    painter.paint(canvas, Offset.zero);
+    canvas.restore();
+  }
+}
+
+class _ChainCalloutStyle {
+  const _ChainCalloutStyle({
+    required this.label,
+    required this.gradientColors,
+    required this.shadowColor,
+    required this.backdropColor,
+    required this.sparkleColor,
+  });
+
+  factory _ChainCalloutStyle.forChain(int chainIndex) {
+    if (chainIndex >= 5) {
+      return const _ChainCalloutStyle(
+        label: 'PERFECT!',
+        gradientColors: [
+          Color(0xFFFFF08A),
+          Color(0xFFFF9A62),
+          Color(0xFFFF4D8D),
+        ],
+        shadowColor: Color(0xFFB45309),
+        backdropColor: Color(0xFFFFEDD5),
+        sparkleColor: Color(0xFFFFF4A3),
+      );
+    }
+    if (chainIndex == 4) {
+      return const _ChainCalloutStyle(
+        label: 'PERFECT!',
+        gradientColors: [
+          Color(0xFFFFD166),
+          Color(0xFFFF7A59),
+          Color(0xFFA855F7),
+        ],
+        shadowColor: Color(0xFF9A3412),
+        backdropColor: Color(0xFFFFF7D6),
+        sparkleColor: Color(0xFFFFD166),
+      );
+    }
+    if (chainIndex == 3) {
+      return const _ChainCalloutStyle(
+        label: 'EXCELLENT!',
+        gradientColors: [
+          Color(0xFF7DD3FC),
+          Color(0xFF60A5FA),
+          Color(0xFFA855F7),
+        ],
+        shadowColor: Color(0xFF3730A3),
+        backdropColor: Color(0xFFE0F2FE),
+        sparkleColor: Color(0xFFBAE6FD),
+      );
+    }
+    return const _ChainCalloutStyle(
+      label: 'GREAT!',
+      gradientColors: [Color(0xFF4ADE80), Color(0xFF2DD4BF), Color(0xFF22D3EE)],
+      shadowColor: Color(0xFF0F766E),
+      backdropColor: Color(0xFFDCFCE7),
+      sparkleColor: Color(0xFF86EFAC),
+    );
+  }
+
+  final String label;
+  final List<Color> gradientColors;
+  final Color shadowColor;
+  final Color backdropColor;
+  final Color sparkleColor;
 }
 
 class _TileVisual {

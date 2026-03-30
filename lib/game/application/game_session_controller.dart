@@ -185,7 +185,6 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     state = state.copyWith(
       phase: GamePhase.resolving,
       inputLocked: true,
-      chainBanner: null,
       currentChain: 0,
     );
 
@@ -249,15 +248,11 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         BoardAnimationEvent.clear(
           wave.boardBeforeClear,
           clearedTileIds: wave.clearedTileIds,
+          clearedPositions: wave.clearedPositions,
+          chainIndex: wave.chainIndex,
           duration: durations.clear,
         ),
       );
-      if (wave.chainIndex > 1) {
-        state = state.copyWith(
-          chainBanner: '${wave.chainIndex}連鎖',
-          currentChain: wave.chainIndex,
-        );
-      }
       await Future<void>.delayed(durations.clear);
 
       nextScore += wave.scoreDelta;
@@ -287,13 +282,6 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       return;
     }
 
-    if (state.chainBanner != null) {
-      await Future<void>.delayed(durations.chainBannerHold);
-      if (!mounted) {
-        return;
-      }
-    }
-
     final availableMoves = _engine.findAvailableMoves(
       state.board,
       remainingRotations: remainingRotations,
@@ -306,7 +294,6 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     state = state.copyWith(
       phase: GamePhase.playing,
       inputLocked: false,
-      chainBanner: null,
       currentChain: 0,
       activeHint: null,
     );
@@ -402,7 +389,6 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       lastRunScore: score,
       bestScore: bestScore,
       inputLocked: false,
-      chainBanner: null,
       currentChain: 0,
       remainingTimeMs: state.remainingTimeMs,
       activeHint: null,

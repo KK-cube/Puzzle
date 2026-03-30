@@ -212,31 +212,6 @@ class _ControlPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: state.chainBanner == null
-                ? const SizedBox.shrink()
-                : Container(
-                    key: ValueKey(state.chainBanner),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF17324D),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      state.chainBanner!,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: compact ? 14 : 16,
-                      ),
-                    ),
-                  ),
-          ),
-          if (state.chainBanner != null) SizedBox(height: compact ? 10 : 12),
           if (compact)
             Row(
               children: [

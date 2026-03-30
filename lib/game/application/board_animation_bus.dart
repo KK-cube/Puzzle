@@ -10,6 +10,8 @@ class BoardAnimationEvent {
     required this.board,
     required this.duration,
     this.clearedTileIds = const <int>{},
+    this.clearedPositions = const <BoardPosition>{},
+    this.chainIndex = 0,
     this.spawnFromTop = false,
   });
 
@@ -37,6 +39,8 @@ class BoardAnimationEvent {
   factory BoardAnimationEvent.clear(
     BoardMatrix board, {
     required Set<int> clearedTileIds,
+    required Set<BoardPosition> clearedPositions,
+    required int chainIndex,
     required Duration duration,
   }) {
     return BoardAnimationEvent._(
@@ -44,6 +48,8 @@ class BoardAnimationEvent {
       board: cloneBoard(board),
       duration: duration,
       clearedTileIds: clearedTileIds,
+      clearedPositions: clearedPositions,
+      chainIndex: chainIndex,
     );
   }
 
@@ -51,6 +57,8 @@ class BoardAnimationEvent {
   final BoardMatrix board;
   final Duration duration;
   final Set<int> clearedTileIds;
+  final Set<BoardPosition> clearedPositions;
+  final int chainIndex;
   final bool spawnFromTop;
 }
 
