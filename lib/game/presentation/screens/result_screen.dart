@@ -11,6 +11,7 @@ class ResultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameSessionControllerProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
+    final backgroundMusic = ref.read(backgroundMusicControllerProvider);
     final title = switch (state.runEndReason) {
       RunEndReason.timeUp => 'Time Up',
       _ => 'No More Moves',
@@ -74,7 +75,10 @@ class ResultScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 28),
                     FilledButton.icon(
-                      onPressed: controller.startNewGame,
+                      onPressed: () async {
+                        await backgroundMusic.ensurePlaying();
+                        controller.startNewGame();
+                      },
                       icon: const Icon(Icons.replay_rounded),
                       label: const Text('Retry'),
                     ),

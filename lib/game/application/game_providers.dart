@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/background_music_controller.dart';
 import '../domain/high_score_repository.dart';
 import '../domain/puzzle_engine.dart';
 import 'board_animation_bus.dart';
@@ -18,6 +21,14 @@ final boardAnimationBusProvider = Provider<BoardAnimationBus>((ref) {
   final bus = BoardAnimationBus();
   ref.onDispose(bus.dispose);
   return bus;
+});
+
+final backgroundMusicControllerProvider = Provider<BackgroundMusicController>((
+  ref,
+) {
+  final controller = AudioBackgroundMusicController();
+  ref.onDispose(() => unawaited(controller.dispose()));
+  return controller;
 });
 
 final gameSessionControllerProvider =

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flutter_application_1/app/puzzle_lines_app.dart';
+import 'package:flutter_application_1/app/background_music_controller.dart';
 import 'package:flutter_application_1/game/application/game_providers.dart';
 import 'package:flutter_application_1/game/domain/high_score_repository.dart';
 import 'package:flutter_application_1/game/presentation/puzzle_board_stage.dart';
@@ -22,6 +23,9 @@ void main() {
         overrides: [
           highScoreRepositoryProvider.overrideWithValue(
             InMemoryHighScoreRepository(1200),
+          ),
+          backgroundMusicControllerProvider.overrideWithValue(
+            SilentBackgroundMusicController(),
           ),
         ],
         child: const PuzzleLinesApp(),
@@ -55,6 +59,9 @@ void main() {
         overrides: [
           highScoreRepositoryProvider.overrideWithValue(
             InMemoryHighScoreRepository(),
+          ),
+          backgroundMusicControllerProvider.overrideWithValue(
+            SilentBackgroundMusicController(),
           ),
         ],
         child: const PuzzleLinesApp(),

@@ -10,6 +10,7 @@ class TitleScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameSessionControllerProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
+    final backgroundMusic = ref.read(backgroundMusicControllerProvider);
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -88,7 +89,10 @@ class TitleScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 34),
                         FilledButton.icon(
-                          onPressed: controller.startNewGame,
+                          onPressed: () async {
+                            await backgroundMusic.ensurePlaying();
+                            controller.startNewGame();
+                          },
                           icon: const Icon(Icons.play_arrow_rounded),
                           label: const Text('Start Run'),
                           style: FilledButton.styleFrom(
