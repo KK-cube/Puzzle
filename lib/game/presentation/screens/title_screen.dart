@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,8 +35,8 @@ class TitleScreen extends ConsumerWidget {
         return;
       }
 
-      await backgroundMusic.ensurePlaying();
       controller.startNewGame();
+      unawaited(backgroundMusic.ensurePlaying());
     }
 
     Future<void> handleEditNickname() async {
@@ -133,7 +135,7 @@ class TitleScreen extends ConsumerWidget {
                         const LeaderboardPanel(),
                         const SizedBox(height: 18),
                         const Text(
-                          '3つ消すと +1 秒、1回の消去で 4つ以上消すと +2 秒。回転は左右のボタンでランダムな 3x3 エリアに使えます。',
+                          '3つ消すと +0.5秒、1回の消去で 4つ以上消すと +1秒。回転は左右のボタンでランダムな 3x3 エリアに使えます。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
@@ -292,11 +294,11 @@ class _PlayerCountBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = !leaderboardEnabled
-        ? '累計プレイヤー数は未接続'
+        ? '累計プレイ数は未接続'
         : playerCount.when(
-            data: (count) => 'これまでに $count人 がプレイ',
-            loading: () => '累計プレイヤー数を読み込み中...',
-            error: (_, _) => '累計プレイヤー数を取得できません',
+            data: (count) => '累計 $count プレイ',
+            loading: () => '累計プレイ数を読み込み中...',
+            error: (_, _) => '累計プレイ数を取得できません',
           );
 
     return Container(

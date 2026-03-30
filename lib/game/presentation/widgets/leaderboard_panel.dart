@@ -32,7 +32,7 @@ class LeaderboardPanel extends ConsumerWidget {
             children: [
               const Icon(Icons.emoji_events_rounded, color: Color(0xFFF59E0B)),
               Text(
-                'ランキング TOP3',
+                'ランキング TOP10',
                 style: TextStyle(
                   fontSize: compact ? 17 : 18,
                   fontWeight: FontWeight.w800,
@@ -44,8 +44,8 @@ class LeaderboardPanel extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             enabled
-                ? 'ベストスコアは Supabase 経由でオンライン共有されます。'
-                : 'オンラインランキングを使うには SUPABASE_URL と SUPABASE_ANON_KEY を設定してください。',
+                ? '1プレイごとのスコアがオンラインランキングに記録されます。'
+                : 'オンラインランキングを使うには接続設定が必要です。',
             style: const TextStyle(
               fontSize: 14,
               height: 1.45,
@@ -59,12 +59,7 @@ class LeaderboardPanel extends ConsumerWidget {
             leaderboard.when(
               data: (entries) => entries.isEmpty
                   ? const _LeaderboardNotice(label: 'まだスコアが登録されていません。')
-                  : Column(
-                      children: [
-                        for (final entry in entries)
-                          _LeaderboardRow(entry: entry),
-                      ],
-                    ),
+                  : _LeaderboardEntries(entries: entries, compact: compact),
               loading: () => const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
@@ -81,6 +76,26 @@ class LeaderboardPanel extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _LeaderboardEntries extends StatelessWidget {
+  const _LeaderboardEntries({required this.entries, required this.compact});
+
+  final List<LeaderboardEntry> entries;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Column(
+      children: [for (final entry in entries) _LeaderboardRow(entry: entry)],
+    );
+
+    if (!compact || entries.length <= 5) {
+      return content;
+    }
+
+    return SizedBox(height: 300, child: SingleChildScrollView(child: content));
   }
 }
 

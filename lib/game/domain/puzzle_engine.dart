@@ -51,11 +51,12 @@ class PuzzleEngine {
     }
 
     final matchedPositions = findMatches(previewBoard);
+    final isRotation = move.type == MoveType.rotate3x3;
     return MoveValidation(
-      isValid: matchedPositions.isNotEmpty,
+      isValid: isRotation || matchedPositions.isNotEmpty,
       previewBoard: previewBoard,
       matchedPositions: matchedPositions,
-      consumesRotation: move.type == MoveType.rotate3x3,
+      consumesRotation: isRotation,
     );
   }
 

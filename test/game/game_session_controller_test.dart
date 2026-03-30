@@ -46,7 +46,7 @@ void main() {
     },
   );
 
-  test('invalid rotation does not consume a charge', () async {
+  test('rotation without a match still consumes a charge', () async {
     final engine = _FakeRotationEngine(validRotations: 0);
     final controller = GameSessionController(
       engine: engine,
@@ -60,9 +60,9 @@ void main() {
     controller.startNewGame();
     await controller.rotateSelection(RotationDirection.clockwise);
 
-    expect(controller.state.remainingRotations, kInitialRotationCharges);
+    expect(controller.state.remainingRotations, kInitialRotationCharges - 1);
     expect(controller.state.phase, GamePhase.playing);
-    expect(engine.applyMoveCalls, 0);
+    expect(engine.applyMoveCalls, 1);
   });
 
   test('run starts at 30 seconds and ends when the timer reaches zero', () {
@@ -103,7 +103,7 @@ void main() {
     threeTileController.startNewGame();
 
     await threeTileController.swapRows(0, 1);
-    expect(threeTileController.state.remainingTimeMs, 31000);
+    expect(threeTileController.state.remainingTimeMs, 30500);
 
     final fourTileController = GameSessionController(
       engine: _FakeClearEngine(clearedTiles: 4),
@@ -115,7 +115,7 @@ void main() {
     fourTileController.startNewGame();
 
     await fourTileController.swapRows(0, 1);
-    expect(fourTileController.state.remainingTimeMs, 32000);
+    expect(fourTileController.state.remainingTimeMs, 31000);
   });
 
   test('shows a hint after 5 seconds without clearing', () {
@@ -197,19 +197,19 @@ class _FakeRotationEngine extends PuzzleEngine {
   }) {
     if (move.type == MoveType.rotate3x3) {
       rotationValidationInputs.add(remainingRotations);
-      final isValid =
+      final canRotate =
           remainingRotations > 0 &&
-          applyMoveCalls < validRotations &&
           move.center != null &&
           move.center!.isRotationCenter;
+      final createsMatch = applyMoveCalls < validRotations;
 
       return MoveValidation(
-        isValid: isValid,
+        isValid: canRotate,
         previewBoard: cloneBoard(board),
-        matchedPositions: isValid
+        matchedPositions: createsMatch
             ? {const BoardPosition(0, 0)}
             : const <BoardPosition>{},
-        consumesRotation: isValid,
+        consumesRotation: canRotate,
       );
     }
 
@@ -229,22 +229,26 @@ class _FakeRotationEngine extends PuzzleEngine {
   }) {
     applyMoveCalls++;
     final snapshot = cloneBoard(board);
+    final createsMatch =
+        move.type != MoveType.rotate3x3 || applyMoveCalls <= validRotations;
     return MoveApplication(
       isValid: true,
       previewBoard: snapshot,
       finalBoard: snapshot,
-      waves: [
-        ResolveWave(
-          chainIndex: 1,
-          boardBeforeClear: snapshot,
-          boardAfterRefill: snapshot,
-          clearedPositions: {const BoardPosition(0, 0)},
-          clearedTileIds: {snapshot[0][0].id},
-          scoreDelta: 30,
-        ),
-      ],
-      totalScore: 30,
-      totalChains: 1,
+      waves: createsMatch
+          ? [
+              ResolveWave(
+                chainIndex: 1,
+                boardBeforeClear: snapshot,
+                boardAfterRefill: snapshot,
+                clearedPositions: {const BoardPosition(0, 0)},
+                clearedTileIds: {snapshot[0][0].id},
+                scoreDelta: 30,
+              ),
+            ]
+          : const [],
+      totalScore: createsMatch ? 30 : 0,
+      totalChains: createsMatch ? 1 : 0,
       consumesRotation: move.type == MoveType.rotate3x3,
     );
   }

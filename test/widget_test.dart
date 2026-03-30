@@ -45,8 +45,8 @@ void main() {
 
     expect(find.text('ラインパルス'), findsOneWidget);
     expect(find.text('1200'), findsOneWidget);
-    expect(find.text('これまでに 3人 がプレイ'), findsOneWidget);
-    expect(find.text('ランキング TOP3'), findsOneWidget);
+    expect(find.text('累計 3 プレイ'), findsOneWidget);
+    expect(find.text('ランキング TOP10'), findsOneWidget);
     expect(find.text('Alice'), findsOneWidget);
 
     await tester.ensureVisible(find.text('ゲーム開始'));

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,11 +33,11 @@ class ResultScreen extends ConsumerWidget {
         ),
       ),
       child: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
               child: Container(
                 padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(
@@ -72,8 +74,8 @@ class ResultScreen extends ConsumerWidget {
                     const SizedBox(height: 28),
                     FilledButton.icon(
                       onPressed: () async {
-                        await backgroundMusic.ensurePlaying();
                         controller.startNewGame();
+                        unawaited(backgroundMusic.ensurePlaying());
                       },
                       icon: const Icon(Icons.replay_rounded),
                       label: const Text('もう一度'),

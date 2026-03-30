@@ -5,7 +5,7 @@ import 'leaderboard_entry.dart';
 abstract class LeaderboardRepository {
   bool get isEnabled;
 
-  Future<List<LeaderboardEntry>> fetchTop3();
+  Future<List<LeaderboardEntry>> fetchTopEntries({int limit = 10});
 
   Future<int> fetchPlayerCount();
 
@@ -19,7 +19,8 @@ class DisabledLeaderboardRepository implements LeaderboardRepository {
   bool get isEnabled => false;
 
   @override
-  Future<List<LeaderboardEntry>> fetchTop3() async => const [];
+  Future<List<LeaderboardEntry>> fetchTopEntries({int limit = 10}) async =>
+      const [];
 
   @override
   Future<int> fetchPlayerCount() async => 0;
@@ -32,19 +33,43 @@ class DisabledLeaderboardRepository implements LeaderboardRepository {
 }
 
 class InMemoryLeaderboardRepository implements LeaderboardRepository {
-  InMemoryLeaderboardRepository({Map<String, int>? seedScores})
-    : _scores = Map<String, int>.from(seedScores ?? const {});
+  InMemoryLeaderboardRepository({
+    Map<String, int>? seedScores,
+    List<LeaderboardSubmission>? seedSubmissions,
+  }) : _submissions = [] {
+    for (final entry in (seedScores ?? const <String, int>{}).entries) {
+      _submissions.add(
+        _InMemorySubmission(
+          playerName: entry.key,
+          score: entry.value,
+          sequence: _nextSequence++,
+        ),
+      );
+    }
+    for (final submission
+        in seedSubmissions ?? const <LeaderboardSubmission>[]) {
+      _submissions.add(
+        _InMemorySubmission(
+          playerName: submission.playerName,
+          score: submission.score,
+          sequence: _nextSequence++,
+        ),
+      );
+    }
+  }
 
-  final Map<String, int> _scores;
+  final List<_InMemorySubmission> _submissions;
+  int _nextSequence = 0;
 
   @override
   bool get isEnabled => true;
 
   @override
-  Future<List<LeaderboardEntry>> fetchTop3() async => _rankedEntries();
+  Future<List<LeaderboardEntry>> fetchTopEntries({int limit = 10}) async =>
+      _rankedEntries(limit: limit);
 
   @override
-  Future<int> fetchPlayerCount() async => _scores.length;
+  Future<int> fetchPlayerCount() async => _submissions.length;
 
   @override
   Future<void> submitScore({
@@ -56,28 +81,41 @@ class InMemoryLeaderboardRepository implements LeaderboardRepository {
       return;
     }
 
-    final current = _scores[trimmedName];
-    if (current == null || score > current) {
-      _scores[trimmedName] = score;
-    }
+    _submissions.add(
+      _InMemorySubmission(
+        playerName: trimmedName,
+        score: score,
+        sequence: _nextSequence++,
+      ),
+    );
   }
 
-  List<LeaderboardEntry> _rankedEntries() {
-    final entries = _scores.entries.toList()
+  List<LeaderboardEntry> _rankedEntries({required int limit}) {
+    if (limit <= 0) {
+      return const [];
+    }
+
+    final entries = List<_InMemorySubmission>.from(_submissions)
       ..sort((left, right) {
-        final byScore = right.value.compareTo(left.value);
+        final byScore = right.score.compareTo(left.score);
         if (byScore != 0) {
           return byScore;
         }
-        return left.key.toLowerCase().compareTo(right.key.toLowerCase());
+        final bySequence = left.sequence.compareTo(right.sequence);
+        if (bySequence != 0) {
+          return bySequence;
+        }
+        return left.playerName.toLowerCase().compareTo(
+          right.playerName.toLowerCase(),
+        );
       });
 
     return [
-      for (var index = 0; index < entries.length && index < 3; index += 1)
+      for (var index = 0; index < entries.length && index < limit; index += 1)
         LeaderboardEntry(
           rank: index + 1,
-          playerName: entries[index].key,
-          score: entries[index].value,
+          playerName: entries[index].playerName,
+          score: entries[index].score,
         ),
     ];
   }
@@ -92,8 +130,11 @@ class SupabaseLeaderboardRepository implements LeaderboardRepository {
   bool get isEnabled => true;
 
   @override
-  Future<List<LeaderboardEntry>> fetchTop3() async {
-    final response = await _client.rpc<List<dynamic>>('get_leaderboard_top3');
+  Future<List<LeaderboardEntry>> fetchTopEntries({int limit = 10}) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'get_leaderboard',
+      params: {'p_limit': limit},
+    );
     final rows = response;
     return rows
         .map((row) => _toEntry(_normalizeRow(row)))
@@ -152,4 +193,23 @@ class SupabaseLeaderboardRepository implements LeaderboardRepository {
     }
     return 0;
   }
+}
+
+class LeaderboardSubmission {
+  const LeaderboardSubmission({required this.playerName, required this.score});
+
+  final String playerName;
+  final int score;
+}
+
+class _InMemorySubmission {
+  const _InMemorySubmission({
+    required this.playerName,
+    required this.score,
+    required this.sequence,
+  });
+
+  final String playerName;
+  final int score;
+  final int sequence;
 }

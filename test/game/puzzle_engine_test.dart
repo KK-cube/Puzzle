@@ -81,6 +81,7 @@ void main() {
           remainingRotations: kInitialRotationCharges,
         );
         expect(rotationValidation.isValid, isTrue);
+        expect(rotationValidation.consumesRotation, isTrue);
 
         final noChargeValidation = engine.validateMove(
           rotationBoard,
@@ -116,6 +117,34 @@ void main() {
       expect(result.waves, isEmpty);
       expect(result.totalScore, 0);
       expect(boardsShareLayout(result.finalBoard, board), isTrue);
+    });
+
+    test('rotation applies even when no match is created', () {
+      final engine = PuzzleEngine(random: Random(21));
+      final board = _boardFromRows(const [
+        'ABCDEAB',
+        'BCDEABC',
+        'CDEABCD',
+        'DEABCDE',
+        'EABCDEA',
+        'ABCDEAB',
+        'BCDEABC',
+      ]);
+
+      final result = engine.applyMove(
+        board,
+        MoveCommand.rotate3x3(
+          center: const BoardPosition(1, 1),
+          direction: RotationDirection.clockwise,
+        ),
+        remainingRotations: kInitialRotationCharges,
+      );
+
+      expect(result.isValid, isTrue);
+      expect(result.consumesRotation, isTrue);
+      expect(result.waves, isEmpty);
+      expect(result.totalScore, 0);
+      expect(boardsShareLayout(result.finalBoard, board), isFalse);
     });
 
     test('resolveBoard handles chains and applies score multipliers', () {

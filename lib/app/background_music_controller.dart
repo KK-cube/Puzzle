@@ -33,22 +33,22 @@ class AudioBackgroundMusicController
       return;
     }
 
-    _resumeOnForeground = true;
-    if (_started) {
-      if (_player.state != PlayerState.playing) {
-        await _player.resume();
-      }
-      return;
-    }
-
     try {
+      _resumeOnForeground = true;
+      if (_started) {
+        if (_player.state != PlayerState.playing) {
+          await _player.resume();
+        }
+        return;
+      }
+
       await _player.setReleaseMode(ReleaseMode.loop);
       await _player.setVolume(0.38);
       await _player.setSourceAsset(kBackgroundMusicAsset);
       await _player.resume();
       _started = true;
     } catch (_) {
-      // Ignore startup failures so the game stays playable if audio is blocked.
+      // Ignore playback failures so the game stays playable if audio is blocked.
     }
   }
 

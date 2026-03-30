@@ -27,7 +27,9 @@ class LeaderboardController
       state = const AsyncValue.loading();
     }
 
-    final nextState = await AsyncValue.guard(_repository.fetchTop3);
+    final nextState = await AsyncValue.guard(
+      () => _repository.fetchTopEntries(limit: 10),
+    );
     if (!mounted) {
       return;
     }
