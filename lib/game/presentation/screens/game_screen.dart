@@ -100,9 +100,7 @@ class GameScreen extends ConsumerWidget {
   }
 
   bool _canRotate(GameSessionState state) {
-    return !state.inputLocked &&
-        state.selectedRotationCenter != null &&
-        state.remainingRotations > 0;
+    return !state.inputLocked && state.remainingRotations > 0;
   }
 
   static String _formatTime(int milliseconds) {
@@ -268,11 +266,9 @@ class _ControlPanel extends StatelessWidget {
             ),
           SizedBox(height: compact ? 8 : 10),
           Text(
-            state.selectedRotationCenter == null
-                ? state.remainingRotations > 0
-                      ? '中央の牌をタップして 3x3 回転を選択します。'
-                      : 'このプレイではもう回転できません。'
-                : '${state.selectedRotationCenter!.row + 1}行 ${state.selectedRotationCenter!.column + 1}列 を中心に回転できます。',
+            state.remainingRotations > 0
+                ? '左右のボタンでランダムな 3x3 エリアを回転します。'
+                : 'このプレイではもう回転できません。',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: compact ? 13 : 14,

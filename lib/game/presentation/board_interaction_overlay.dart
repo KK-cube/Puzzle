@@ -87,11 +87,7 @@ class _BoardInteractionOverlayState
 
     final controller = ref.read(gameSessionControllerProvider.notifier);
     controller.noteInteraction();
-    if (cell.isRotationCenter) {
-      controller.selectRotationCenter(cell);
-    } else {
-      controller.clearRotationSelection();
-    }
+    controller.clearRotationSelection();
   }
 
   void _handlePanStart(Offset position, BoardGeometry geometry) {
@@ -143,27 +139,27 @@ class _BoardInteractionOverlayState
     final rawOffset = activeDrag.axis == BoardDragAxis.row
         ? position.dy - activeDrag.startPosition.dy
         : position.dx - activeDrag.startPosition.dx;
-    final clampedOffset = activeDrag.axis == BoardDragAxis.row
-        ? geometry.clampRowOffset(activeDrag.sourceIndex, rawOffset)
-        : geometry.clampColumnOffset(activeDrag.sourceIndex, rawOffset);
+    final snappedOffset = activeDrag.axis == BoardDragAxis.row
+        ? geometry.snappedRowOffset(activeDrag.sourceIndex, rawOffset)
+        : geometry.snappedColumnOffset(activeDrag.sourceIndex, rawOffset);
     final targetIndex = activeDrag.axis == BoardDragAxis.row
-        ? geometry.nearestRowForOffset(activeDrag.sourceIndex, clampedOffset)
+        ? geometry.nearestRowForOffset(activeDrag.sourceIndex, snappedOffset)
         : geometry.nearestColumnForOffset(
             activeDrag.sourceIndex,
-            clampedOffset,
+            snappedOffset,
           );
     final preview = BoardDragPreview(
       axis: activeDrag.axis,
       sourceIndex: activeDrag.sourceIndex,
       targetIndex: targetIndex,
-      offset: clampedOffset,
+      offset: snappedOffset,
     );
 
     widget.dragPreview.value = preview;
     setState(() {
       _activeDrag = activeDrag.copyWith(
         targetIndex: targetIndex,
-        offset: clampedOffset,
+        offset: snappedOffset,
       );
     });
   }

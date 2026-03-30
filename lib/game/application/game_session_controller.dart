@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -39,10 +40,12 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     required PuzzleEngine engine,
     required HighScoreRepository highScoreRepository,
     required BoardAnimationBus animationBus,
+    Random? random,
     this.durations = const GameSessionDurations(),
   }) : _engine = engine,
        _highScoreRepository = highScoreRepository,
        _animationBus = animationBus,
+       _random = random ?? Random(),
        super(const GameSessionState.initial()) {
     unawaited(_loadBestScore());
   }
@@ -50,6 +53,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   final PuzzleEngine _engine;
   final HighScoreRepository _highScoreRepository;
   final BoardAnimationBus _animationBus;
+  final Random _random;
   final GameSessionDurations durations;
   Timer? _countdownTimer;
   int _inactiveHintMs = 0;
@@ -146,13 +150,16 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   Future<void> rotateSelection(RotationDirection direction) async {
-    final center = state.selectedRotationCenter;
-    if (center == null || state.remainingRotations <= 0) {
-      clearRotationSelection();
+    if (state.remainingRotations <= 0) {
       return;
     }
 
-    await _runMove(MoveCommand.rotate3x3(center: center, direction: direction));
+    await _runMove(
+      MoveCommand.rotate3x3(
+        center: _randomRotationCenter(),
+        direction: direction,
+      ),
+    );
   }
 
   Future<void> _runMove(MoveCommand move) async {
@@ -359,6 +366,12 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     }
 
     return BoardHint(move: moves.first);
+  }
+
+  BoardPosition _randomRotationCenter() {
+    final row = 1 + _random.nextInt(kBoardSize - 2);
+    final column = 1 + _random.nextInt(kBoardSize - 2);
+    return BoardPosition(row, column);
   }
 
   int _timeBonusForClearedTiles(int clearedTiles) {

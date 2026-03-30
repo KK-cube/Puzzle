@@ -13,6 +13,7 @@ import 'game_session_controller.dart';
 import 'game_session_state.dart';
 import 'leaderboard_controller.dart';
 import 'player_nickname_controller.dart';
+import 'player_count_controller.dart';
 
 final highScoreRepositoryProvider = Provider<HighScoreRepository>((ref) {
   return InMemoryHighScoreRepository();
@@ -63,6 +64,13 @@ final leaderboardControllerProvider =
       AsyncValue<List<LeaderboardEntry>>
     >((ref) {
       return LeaderboardController(
+        repository: ref.watch(leaderboardRepositoryProvider),
+      );
+    });
+
+final playerCountControllerProvider =
+    StateNotifierProvider<PlayerCountController, AsyncValue<int>>((ref) {
+      return PlayerCountController(
         repository: ref.watch(leaderboardRepositoryProvider),
       );
     });

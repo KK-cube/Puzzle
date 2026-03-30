@@ -12,13 +12,14 @@ import 'package:flutter_application_1/game/domain/puzzle_engine.dart';
 
 void main() {
   test(
-    'rotation charges decrement to zero and block further selection',
+    'rotation charges decrement to zero and block further random rotations',
     () async {
       final engine = _FakeRotationEngine();
       final controller = GameSessionController(
         engine: engine,
         highScoreRepository: InMemoryHighScoreRepository(),
         animationBus: BoardAnimationBus(),
+        random: Random(1),
         durations: const GameSessionDurations.instant(),
       );
       addTearDown(controller.dispose);
@@ -26,22 +27,22 @@ void main() {
       controller.startNewGame();
 
       for (
-        var expectedRemaining = 2;
+        var expectedRemaining = kInitialRotationCharges - 1;
         expectedRemaining >= 0;
         expectedRemaining--
       ) {
-        controller.selectRotationCenter(const BoardPosition(1, 1));
         await controller.rotateSelection(RotationDirection.clockwise);
         expect(controller.state.remainingRotations, expectedRemaining);
       }
 
-      controller.selectRotationCenter(const BoardPosition(1, 1));
       expect(controller.state.selectedRotationCenter, isNull);
 
       await controller.rotateSelection(RotationDirection.clockwise);
       expect(controller.state.remainingRotations, 0);
-      expect(engine.applyMoveCalls, 3);
-      expect(engine.rotationValidationInputs, [3, 2, 1]);
+      expect(engine.applyMoveCalls, kInitialRotationCharges);
+      expect(engine.rotationValidationInputs, [
+        for (var value = kInitialRotationCharges; value >= 1; value--) value,
+      ]);
     },
   );
 
@@ -51,12 +52,12 @@ void main() {
       engine: engine,
       highScoreRepository: InMemoryHighScoreRepository(),
       animationBus: BoardAnimationBus(),
+      random: Random(1),
       durations: const GameSessionDurations.instant(),
     );
     addTearDown(controller.dispose);
 
     controller.startNewGame();
-    controller.selectRotationCenter(const BoardPosition(1, 1));
     await controller.rotateSelection(RotationDirection.clockwise);
 
     expect(controller.state.remainingRotations, kInitialRotationCharges);
@@ -199,7 +200,8 @@ class _FakeRotationEngine extends PuzzleEngine {
       final isValid =
           remainingRotations > 0 &&
           applyMoveCalls < validRotations &&
-          move.center != null;
+          move.center != null &&
+          move.center!.isRotationCenter;
 
       return MoveValidation(
         isValid: isValid,

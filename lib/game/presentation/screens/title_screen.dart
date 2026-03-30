@@ -12,6 +12,8 @@ class TitleScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameSessionControllerProvider);
     final nickname = ref.watch(playerNicknameControllerProvider);
+    final playerCount = ref.watch(playerCountControllerProvider);
+    final leaderboardEnabled = ref.watch(leaderboardEnabledProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
     final nicknameController = ref.read(
       playerNicknameControllerProvider.notifier,
@@ -101,6 +103,13 @@ class TitleScreen extends ConsumerWidget {
                             color: Color(0xFF314155),
                           ),
                         ),
+                        const SizedBox(height: 22),
+                        _StartRunPanel(
+                          nickname: nickname,
+                          playerCount: playerCount,
+                          leaderboardEnabled: leaderboardEnabled,
+                          onPressed: handleStart,
+                        ),
                         const SizedBox(height: 28),
                         Wrap(
                           spacing: 14,
@@ -112,7 +121,7 @@ class TitleScreen extends ConsumerWidget {
                             ),
                             const _InfoCard(label: '時間', value: '30秒'),
                             const _InfoCard(label: '盤面', value: '7 x 7'),
-                            const _InfoCard(label: '回転', value: '3回/プレイ'),
+                            const _InfoCard(label: '回転', value: '10回/プレイ'),
                           ],
                         ),
                         const SizedBox(height: 22),
@@ -122,29 +131,9 @@ class TitleScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 18),
                         const LeaderboardPanel(),
-                        const SizedBox(height: 26),
-                        FilledButton.icon(
-                          onPressed: nickname.isLoading ? null : handleStart,
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: Text(
-                            nickname.valueOrNull == null ? '名前を決めて開始' : 'ゲーム開始',
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF17324D),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 28,
-                              vertical: 18,
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
                         const SizedBox(height: 18),
                         const Text(
-                          '3つ消すと +1 秒、1回の消去で 4つ以上消すと +2 秒。回転は中央の牌をタップしてから左右の回転ボタンで使えます。',
+                          '3つ消すと +1 秒、1回の消去で 4つ以上消すと +2 秒。回転は左右のボタンでランダムな 3x3 エリアに使えます。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
@@ -229,6 +218,112 @@ class TitleScreen extends ConsumerWidget {
 
     await controller.saveNickname(result);
     return result;
+  }
+}
+
+class _StartRunPanel extends StatelessWidget {
+  const _StartRunPanel({
+    required this.nickname,
+    required this.playerCount,
+    required this.leaderboardEnabled,
+    required this.onPressed,
+  });
+
+  final AsyncValue<String?> nickname;
+  final AsyncValue<int> playerCount;
+  final bool leaderboardEnabled;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNickname = (nickname.valueOrNull ?? '').trim().isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17324D),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF17324D).withValues(alpha: 0.24),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FilledButton.icon(
+            onPressed: nickname.isLoading ? null : onPressed,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(hasNickname ? 'ゲーム開始' : '名前を決めて開始'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(62),
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: const Color(0xFF172033),
+              textStyle: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _PlayerCountBadge(
+            playerCount: playerCount,
+            leaderboardEnabled: leaderboardEnabled,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerCountBadge extends StatelessWidget {
+  const _PlayerCountBadge({
+    required this.playerCount,
+    required this.leaderboardEnabled,
+  });
+
+  final AsyncValue<int> playerCount;
+  final bool leaderboardEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = !leaderboardEnabled
+        ? '累計プレイヤー数は未接続'
+        : playerCount.when(
+            data: (count) => 'これまでに $count人 がプレイ',
+            loading: () => '累計プレイヤー数を読み込み中...',
+            error: (_, _) => '累計プレイヤー数を取得できません',
+          );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.groups_rounded, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

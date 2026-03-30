@@ -7,6 +7,8 @@ abstract class LeaderboardRepository {
 
   Future<List<LeaderboardEntry>> fetchTop3();
 
+  Future<int> fetchPlayerCount();
+
   Future<void> submitScore({required String playerName, required int score});
 }
 
@@ -18,6 +20,9 @@ class DisabledLeaderboardRepository implements LeaderboardRepository {
 
   @override
   Future<List<LeaderboardEntry>> fetchTop3() async => const [];
+
+  @override
+  Future<int> fetchPlayerCount() async => 0;
 
   @override
   Future<void> submitScore({
@@ -37,6 +42,9 @@ class InMemoryLeaderboardRepository implements LeaderboardRepository {
 
   @override
   Future<List<LeaderboardEntry>> fetchTop3() async => _rankedEntries();
+
+  @override
+  Future<int> fetchPlayerCount() async => _scores.length;
 
   @override
   Future<void> submitScore({
@@ -90,6 +98,12 @@ class SupabaseLeaderboardRepository implements LeaderboardRepository {
     return rows
         .map((row) => _toEntry(_normalizeRow(row)))
         .toList(growable: false);
+  }
+
+  @override
+  Future<int> fetchPlayerCount() async {
+    final response = await _client.rpc<dynamic>('get_leaderboard_player_count');
+    return _readInt(response);
   }
 
   @override

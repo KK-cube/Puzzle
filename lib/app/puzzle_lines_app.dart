@@ -29,9 +29,12 @@ class PuzzleLinesApp extends ConsumerWidget {
       }
 
       unawaited(
-        ref
-            .read(leaderboardControllerProvider.notifier)
-            .submitScore(playerName: nickname, score: next.lastRunScore),
+        (() async {
+          await ref
+              .read(leaderboardControllerProvider.notifier)
+              .submitScore(playerName: nickname, score: next.lastRunScore);
+          await ref.read(playerCountControllerProvider.notifier).refresh();
+        })(),
       );
     });
 

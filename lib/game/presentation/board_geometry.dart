@@ -19,9 +19,22 @@ class BoardGeometry {
     10,
     18,
   );
+  late final double touchHitSlop = clampDouble(cellSize * 0.28, 10, 18);
+  late final double rowSnapRadius = clampDouble(cellSize * 0.24, 10, 18);
+  late final double columnSnapRadius = clampDouble(cellSize * 0.38, 14, 24);
+  static const double _rowSnapBias = 1.0;
+  static const double _columnSnapBias = 1.25;
+  static const double _rowSnapStrength = 0.42;
+  static const double _columnSnapStrength = 0.78;
   late final Offset origin = Offset(
     (_size.width - boardSize) / 2,
     (_size.height - boardSize) / 2,
+  );
+  late final Rect panelRect = Rect.fromLTWH(
+    origin.dx,
+    origin.dy,
+    boardSize,
+    boardSize,
   );
   late final Rect boardRect = Rect.fromLTWH(
     origin.dx + outerPadding,
@@ -58,12 +71,16 @@ class BoardGeometry {
   }
 
   BoardPosition? cellAt(Offset point) {
-    if (!boardRect.contains(point)) {
+    if (!panelRect.inflate(touchHitSlop).contains(point)) {
       return null;
     }
 
-    final row = ((point.dy - boardRect.top) / cellSize).floor();
-    final column = ((point.dx - boardRect.left) / cellSize).floor();
+    final clampedPoint = Offset(
+      point.dx.clamp(boardRect.left, boardRect.right - 0.001),
+      point.dy.clamp(boardRect.top, boardRect.bottom - 0.001),
+    );
+    final row = ((clampedPoint.dy - boardRect.top) / cellSize).floor();
+    final column = ((clampedPoint.dx - boardRect.left) / cellSize).floor();
     if (!_isBoardIndex(row) || !_isBoardIndex(column)) {
       return null;
     }
@@ -88,14 +105,37 @@ class BoardGeometry {
   }
 
   int nearestRowForOffset(int sourceRow, double offset) {
-    final y = rowCenter(sourceRow) + clampRowOffset(sourceRow, offset);
-    return ((y - boardRect.top) / cellSize).round().clamp(0, kBoardSize - 1);
+    final normalizedOffset =
+        (clampRowOffset(sourceRow, offset) / cellSize) * _rowSnapBias;
+    return (sourceRow + normalizedOffset).round().clamp(0, kBoardSize - 1);
   }
 
   int nearestColumnForOffset(int sourceColumn, double offset) {
-    final x =
-        columnCenter(sourceColumn) + clampColumnOffset(sourceColumn, offset);
-    return ((x - boardRect.left) / cellSize).round().clamp(0, kBoardSize - 1);
+    final normalizedOffset =
+        (clampColumnOffset(sourceColumn, offset) / cellSize) * _columnSnapBias;
+    return (sourceColumn + normalizedOffset).round().clamp(0, kBoardSize - 1);
+  }
+
+  double snappedRowOffset(int sourceRow, double offset) {
+    final clampedOffset = clampRowOffset(sourceRow, offset);
+    final targetRow = nearestRowForOffset(sourceRow, clampedOffset);
+    return _applySnap(
+      clampedOffset,
+      targetOffset: (targetRow - sourceRow) * cellSize,
+      snapRadius: rowSnapRadius,
+      snapStrength: _rowSnapStrength,
+    );
+  }
+
+  double snappedColumnOffset(int sourceColumn, double offset) {
+    final clampedOffset = clampColumnOffset(sourceColumn, offset);
+    final targetColumn = nearestColumnForOffset(sourceColumn, clampedOffset);
+    return _applySnap(
+      clampedOffset,
+      targetOffset: (targetColumn - sourceColumn) * cellSize,
+      snapRadius: columnSnapRadius,
+      snapStrength: _columnSnapStrength,
+    );
   }
 
   bool _isBoardIndex(int value) => value >= 0 && value < kBoardSize;
@@ -104,4 +144,20 @@ class BoardGeometry {
 
   double columnCenter(int column) =>
       boardRect.left + ((column + 0.5) * cellSize);
+
+  double _applySnap(
+    double offset, {
+    required double targetOffset,
+    required double snapRadius,
+    required double snapStrength,
+  }) {
+    final distance = (offset - targetOffset).abs();
+    if (distance <= 0 || distance >= snapRadius) {
+      return offset;
+    }
+
+    final t = 1 - (distance / snapRadius);
+    final eased = t * t * (3 - (2 * t));
+    return offset + ((targetOffset - offset) * eased * snapStrength);
+  }
 }
