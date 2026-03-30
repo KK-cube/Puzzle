@@ -1,3 +1,42 @@
+# Line Pulse
+
+Flutter + Flame で作った 7x7 のライン操作パズルです。  
+行・列の入れ替えと 3x3 回転で 3 つ以上の色を揃え、落下と連鎖でスコアを伸ばします。
+
+## GitHub 連携と公開
+
+ローカル Git は初期化済みです。次は GitHub に空リポジトリを作って、このプロジェクトを push してください。
+
+```bash
+git remote add origin https://github.com/<username>/<repo-name>.git
+git add .
+git commit -m "Initial commit"
+git push -u origin main
+```
+
+その後、GitHub 側で以下を 1 回だけ設定してください。
+
+1. リポジトリの `Settings` を開く
+2. `Pages` を開く
+3. `Source` を `GitHub Actions` にする
+
+このリポジトリには [deploy-web.yml](.github/workflows/deploy-web.yml) が入っているので、`main` に push されるたびに Flutter Web をビルドして GitHub Pages に公開します。
+
+公開 URL は通常この形です。
+
+```text
+https://<username>.github.io/<repo-name>/
+```
+
+## ローカル実行
+
+```bash
+flutter pub get
+flutter run -d chrome
+```
+
+## 仕様メモ
+
 1. 概要
 
 本アプリは、色付きの牌が並んだグリッド盤面において、
