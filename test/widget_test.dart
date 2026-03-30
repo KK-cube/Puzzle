@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/app/puzzle_lines_app.dart';
 import 'package:flutter_application_1/game/application/game_providers.dart';
 import 'package:flutter_application_1/game/domain/high_score_repository.dart';
+import 'package:flutter_application_1/game/presentation/puzzle_board_stage.dart';
 
 void main() {
   testWidgets('title screen starts a run and shows the board HUD', (
@@ -72,5 +73,9 @@ void main() {
       find.text('Drag left to swap rows. Drag top to swap columns.'),
       findsOneWidget,
     );
+
+    final boardStageSize = tester.getSize(find.byType(PuzzleBoardStage));
+    expect(boardStageSize.width, greaterThan(370));
+    expect(boardStageSize.height, boardStageSize.width);
   });
 }

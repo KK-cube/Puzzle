@@ -13,6 +13,12 @@ class GameScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameSessionControllerProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
+    final rotateCounterClockwise = _canRotate(state)
+        ? () => controller.rotateSelection(RotationDirection.counterClockwise)
+        : null;
+    final rotateClockwise = _canRotate(state)
+        ? () => controller.rotateSelection(RotationDirection.clockwise)
+        : null;
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -27,39 +33,55 @@ class GameScreen extends ConsumerWidget {
           builder: (context, constraints) {
             final compact =
                 constraints.maxWidth < 560 || constraints.maxHeight < 780;
-            final outerPadding = compact ? 10.0 : 18.0;
+            if (compact) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+                child: Column(
+                  children: [
+                    _HudSection(state: state, compact: true),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: PuzzleBoardStage(state: state),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _ControlPanel(
+                      state: state,
+                      compact: true,
+                      onRotateCounterClockwise: rotateCounterClockwise,
+                      onRotateClockwise: rotateClockwise,
+                    ),
+                  ],
+                ),
+              );
+            }
 
             return Padding(
-              padding: EdgeInsets.all(outerPadding),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 children: [
-                  _HudSection(state: state, compact: compact),
-                  SizedBox(height: compact ? 10 : 16),
+                  _HudSection(state: state, compact: false),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: compact ? 560 : 720,
-                          maxHeight: compact ? 560 : 720,
+                        constraints: const BoxConstraints(
+                          maxWidth: 720,
+                          maxHeight: 720,
                         ),
                         child: PuzzleBoardStage(state: state),
                       ),
                     ),
                   ),
-                  SizedBox(height: compact ? 10 : 16),
+                  const SizedBox(height: 16),
                   _ControlPanel(
                     state: state,
-                    compact: compact,
-                    onRotateCounterClockwise: _canRotate(state)
-                        ? () => controller.rotateSelection(
-                            RotationDirection.counterClockwise,
-                          )
-                        : null,
-                    onRotateClockwise: _canRotate(state)
-                        ? () => controller.rotateSelection(
-                            RotationDirection.clockwise,
-                          )
-                        : null,
+                    compact: false,
+                    onRotateCounterClockwise: rotateCounterClockwise,
+                    onRotateClockwise: rotateClockwise,
                   ),
                 ],
               ),
