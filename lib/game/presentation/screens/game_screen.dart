@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +15,7 @@ class GameScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameSessionControllerProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
+    final backgroundMusic = ref.read(backgroundMusicControllerProvider);
     final rotateCounterClockwise = _canRotate(state)
         ? () => controller.rotateSelection(RotationDirection.counterClockwise)
         : null;
@@ -20,73 +23,77 @@ class GameScreen extends ConsumerWidget {
         ? () => controller.rotateSelection(RotationDirection.clockwise)
         : null;
 
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFEF3C7), Color(0xFFF2F7F1), Color(0xFFDDEBFF)],
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => unawaited(backgroundMusic.ensurePlaying()),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFEF3C7), Color(0xFFF2F7F1), Color(0xFFDDEBFF)],
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact =
-                constraints.maxWidth < 560 || constraints.maxHeight < 780;
-            if (compact) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact =
+                  constraints.maxWidth < 560 || constraints.maxHeight < 780;
+              if (compact) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+                  child: Column(
+                    children: [
+                      _HudSection(state: state, compact: true),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: PuzzleBoardStage(state: state),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _ControlPanel(
+                        state: state,
+                        compact: true,
+                        onRotateCounterClockwise: rotateCounterClockwise,
+                        onRotateClockwise: rotateClockwise,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.all(18),
                 child: Column(
                   children: [
-                    _HudSection(state: state, compact: true),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: PuzzleBoardStage(state: state),
+                    _HudSection(state: state, compact: false),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: 720,
+                            maxHeight: 720,
+                          ),
+                          child: PuzzleBoardStage(state: state),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 16),
                     _ControlPanel(
                       state: state,
-                      compact: true,
+                      compact: false,
                       onRotateCounterClockwise: rotateCounterClockwise,
                       onRotateClockwise: rotateClockwise,
                     ),
                   ],
                 ),
               );
-            }
-
-            return Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                children: [
-                  _HudSection(state: state, compact: false),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: 720,
-                          maxHeight: 720,
-                        ),
-                        child: PuzzleBoardStage(state: state),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _ControlPanel(
-                    state: state,
-                    compact: false,
-                    onRotateCounterClockwise: rotateCounterClockwise,
-                    onRotateClockwise: rotateClockwise,
-                  ),
-                ],
-              ),
-            );
-          },
+            },
+          ),
         ),
       ),
     );

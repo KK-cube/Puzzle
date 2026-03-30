@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 const kBackgroundMusicAsset = 'WEARETHEGOOD - Live in the Moment.mp3';
@@ -16,7 +17,9 @@ class AudioBackgroundMusicController
     implements BackgroundMusicController {
   AudioBackgroundMusicController({AudioPlayer? player})
     : _player = player ?? AudioPlayer() {
-    WidgetsBinding.instance.addObserver(this);
+    if (!kIsWeb) {
+      WidgetsBinding.instance.addObserver(this);
+    }
   }
 
   final AudioPlayer _player;
@@ -51,7 +54,7 @@ class AudioBackgroundMusicController
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_disposed || !_started) {
+    if (_disposed || !_started || kIsWeb) {
       return;
     }
 
@@ -78,7 +81,9 @@ class AudioBackgroundMusicController
     }
 
     _disposed = true;
-    WidgetsBinding.instance.removeObserver(this);
+    if (!kIsWeb) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
     await _player.dispose();
   }
 }
