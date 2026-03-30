@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/game_providers.dart';
 import '../../application/game_session_state.dart';
 import '../widgets/leaderboard_panel.dart';
+import '../widgets/music_settings_button.dart';
 
 class ResultScreen extends ConsumerWidget {
   const ResultScreen({super.key});
@@ -55,6 +56,11 @@ class ResultScreen extends ConsumerWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: MusicSettingsButton(compact: true),
+                          ),
+                          const SizedBox(height: 12),
                           Text(
                             title,
                             style: const TextStyle(

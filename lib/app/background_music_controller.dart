@@ -7,7 +7,11 @@ import 'package:flutter/widgets.dart';
 const kBackgroundMusicAsset = 'WEARETHEGOOD - Live in the Moment.mp3';
 
 abstract class BackgroundMusicController {
+  bool get isEnabled;
+
   Future<void> ensurePlaying();
+
+  Future<void> setEnabled(bool enabled);
 
   Future<void> dispose();
 }
@@ -15,21 +19,28 @@ abstract class BackgroundMusicController {
 class AudioBackgroundMusicController
     with WidgetsBindingObserver
     implements BackgroundMusicController {
-  AudioBackgroundMusicController({AudioPlayer? player})
-    : _player = player ?? AudioPlayer() {
+  AudioBackgroundMusicController({
+    AudioPlayer? player,
+    bool initialEnabled = true,
+  }) : _player = player ?? AudioPlayer(),
+       _enabled = initialEnabled {
     if (!kIsWeb) {
       WidgetsBinding.instance.addObserver(this);
     }
   }
 
   final AudioPlayer _player;
+  bool _enabled;
   bool _started = false;
   bool _resumeOnForeground = false;
   bool _disposed = false;
 
   @override
+  bool get isEnabled => _enabled;
+
+  @override
   Future<void> ensurePlaying() async {
-    if (_disposed) {
+    if (_disposed || !_enabled) {
       return;
     }
 
@@ -53,8 +64,30 @@ class AudioBackgroundMusicController
   }
 
   @override
+  Future<void> setEnabled(bool enabled) async {
+    if (_disposed || _enabled == enabled) {
+      return;
+    }
+
+    _enabled = enabled;
+    if (!_enabled) {
+      _resumeOnForeground = false;
+      try {
+        if (_player.state == PlayerState.playing) {
+          await _player.pause();
+        }
+      } catch (_) {
+        // Ignore audio teardown failures so toggling stays responsive.
+      }
+      return;
+    }
+
+    await ensurePlaying();
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_disposed || !_started || kIsWeb) {
+    if (_disposed || !_started || !_enabled || kIsWeb) {
       return;
     }
 
@@ -89,8 +122,20 @@ class AudioBackgroundMusicController
 }
 
 class SilentBackgroundMusicController implements BackgroundMusicController {
+  SilentBackgroundMusicController({this.enabled = true});
+
+  bool enabled;
+
+  @override
+  bool get isEnabled => enabled;
+
   @override
   Future<void> ensurePlaying() async {}
+
+  @override
+  Future<void> setEnabled(bool enabled) async {
+    this.enabled = enabled;
+  }
 
   @override
   Future<void> dispose() async {}

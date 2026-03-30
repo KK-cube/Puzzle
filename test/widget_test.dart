@@ -12,6 +12,7 @@ import 'package:flutter_application_1/game/application/game_session_controller.d
 import 'package:flutter_application_1/game/application/game_session_state.dart';
 import 'package:flutter_application_1/game/domain/high_score_repository.dart';
 import 'package:flutter_application_1/game/domain/leaderboard_repository.dart';
+import 'package:flutter_application_1/game/domain/music_settings_repository.dart';
 import 'package:flutter_application_1/game/domain/player_nickname_repository.dart';
 import 'package:flutter_application_1/game/domain/puzzle_engine.dart';
 import 'package:flutter_application_1/game/presentation/puzzle_board_stage.dart';
@@ -144,6 +145,50 @@ void main() {
 
     expect(find.text('ニックネームを入力'), findsOneWidget);
     expect(find.text('保存'), findsOneWidget);
+  });
+
+  testWidgets('music setting can be toggled from the title screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 2200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          highScoreRepositoryProvider.overrideWithValue(
+            InMemoryHighScoreRepository(),
+          ),
+          backgroundMusicControllerProvider.overrideWithValue(
+            SilentBackgroundMusicController(),
+          ),
+          musicSettingsRepositoryProvider.overrideWithValue(
+            InMemoryMusicSettingsRepository(),
+          ),
+          leaderboardRepositoryProvider.overrideWithValue(
+            InMemoryLeaderboardRepository(),
+          ),
+          playerNicknameRepositoryProvider.overrideWithValue(
+            InMemoryPlayerNicknameRepository('Tester'),
+          ),
+        ],
+        child: const PuzzleLinesApp(),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('音楽 ON'), findsOneWidget);
+
+    await tester.tap(find.text('音楽 ON'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('閉じる'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('音楽 OFF'), findsOneWidget);
   });
 
   testWidgets(

@@ -7,6 +7,7 @@ import '../../application/game_providers.dart';
 import '../../application/game_session_state.dart';
 import '../../domain/models.dart';
 import '../puzzle_board_stage.dart';
+import '../widgets/music_settings_button.dart';
 
 class GameScreen extends ConsumerWidget {
   const GameScreen({super.key});
@@ -44,6 +45,11 @@ class GameScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
                   child: Column(
                     children: [
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: MusicSettingsButton(compact: true),
+                      ),
+                      const SizedBox(height: 8),
                       _HudSection(state: state, compact: true),
                       const SizedBox(height: 10),
                       SizedBox(
@@ -69,6 +75,11 @@ class GameScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(18),
                 child: Column(
                   children: [
+                    const Align(
+                      alignment: Alignment.centerRight,
+                      child: MusicSettingsButton(),
+                    ),
+                    const SizedBox(height: 12),
                     _HudSection(state: state, compact: false),
                     const SizedBox(height: 16),
                     Expanded(

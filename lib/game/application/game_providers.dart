@@ -6,12 +6,14 @@ import '../../app/background_music_controller.dart';
 import '../domain/high_score_repository.dart';
 import '../domain/leaderboard_entry.dart';
 import '../domain/leaderboard_repository.dart';
+import '../domain/music_settings_repository.dart';
 import '../domain/player_nickname_repository.dart';
 import '../domain/puzzle_engine.dart';
 import 'board_animation_bus.dart';
 import 'game_session_controller.dart';
 import 'game_session_state.dart';
 import 'leaderboard_controller.dart';
+import 'music_settings_controller.dart';
 import 'player_nickname_controller.dart';
 import 'player_count_controller.dart';
 
@@ -23,6 +25,12 @@ final playerNicknameRepositoryProvider = Provider<PlayerNicknameRepository>((
   ref,
 ) {
   return InMemoryPlayerNicknameRepository();
+});
+
+final musicSettingsRepositoryProvider = Provider<MusicSettingsRepository>((
+  ref,
+) {
+  return InMemoryMusicSettingsRepository();
 });
 
 final leaderboardRepositoryProvider = Provider<LeaderboardRepository>((ref) {
@@ -51,6 +59,13 @@ final playerNicknameControllerProvider =
     StateNotifierProvider<PlayerNicknameController, AsyncValue<String?>>((ref) {
       return PlayerNicknameController(
         repository: ref.watch(playerNicknameRepositoryProvider),
+      );
+    });
+
+final musicSettingsControllerProvider =
+    StateNotifierProvider<MusicSettingsController, AsyncValue<bool>>((ref) {
+      return MusicSettingsController(
+        repository: ref.watch(musicSettingsRepositoryProvider),
       );
     });
 
