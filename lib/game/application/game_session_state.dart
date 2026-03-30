@@ -5,6 +5,7 @@ enum GamePhase { title, playing, resolving, result }
 enum RunEndReason { noMoreMoves, timeUp }
 
 const kInitialRunTimeMs = 30000;
+const kHintDelayMs = 8000;
 
 const _unset = Object();
 
@@ -18,6 +19,7 @@ class GameSessionState {
     required this.currentChain,
     required this.remainingRotations,
     required this.remainingTimeMs,
+    required this.activeHint,
     required this.selectedRotationCenter,
     required this.inputLocked,
     required this.chainBanner,
@@ -33,6 +35,7 @@ class GameSessionState {
       currentChain = 0,
       remainingRotations = kInitialRotationCharges,
       remainingTimeMs = kInitialRunTimeMs,
+      activeHint = null,
       selectedRotationCenter = null,
       inputLocked = false,
       chainBanner = null,
@@ -46,6 +49,7 @@ class GameSessionState {
   final int currentChain;
   final int remainingRotations;
   final int remainingTimeMs;
+  final BoardHint? activeHint;
   final BoardPosition? selectedRotationCenter;
   final bool inputLocked;
   final String? chainBanner;
@@ -62,6 +66,7 @@ class GameSessionState {
     int? currentChain,
     int? remainingRotations,
     int? remainingTimeMs,
+    Object? activeHint = _unset,
     Object? selectedRotationCenter = _unset,
     bool? inputLocked,
     Object? chainBanner = _unset,
@@ -76,6 +81,9 @@ class GameSessionState {
       currentChain: currentChain ?? this.currentChain,
       remainingRotations: remainingRotations ?? this.remainingRotations,
       remainingTimeMs: remainingTimeMs ?? this.remainingTimeMs,
+      activeHint: identical(activeHint, _unset)
+          ? this.activeHint
+          : activeHint as BoardHint?,
       selectedRotationCenter: identical(selectedRotationCenter, _unset)
           ? this.selectedRotationCenter
           : selectedRotationCenter as BoardPosition?,

@@ -116,6 +116,51 @@ void main() {
     await fourTileController.swapRows(0, 1);
     expect(fourTileController.state.remainingTimeMs, 32000);
   });
+
+  test('shows a hint after 8 seconds without clearing', () {
+    fakeAsync((async) {
+      final controller = GameSessionController(
+        engine: _FakeClearEngine(clearedTiles: 3),
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations.instant(),
+      );
+      addTearDown(controller.dispose);
+
+      controller.startNewGame();
+      async.elapse(const Duration(seconds: 8));
+
+      expect(controller.state.activeHint, isNotNull);
+      expect(controller.state.activeHint!.move.type, MoveType.swapRow);
+      expect(controller.state.activeHint!.move.primaryIndex, 0);
+      expect(controller.state.activeHint!.move.secondaryIndex, 1);
+    });
+  });
+
+  test('interaction clears the active hint and resets the hint timer', () {
+    fakeAsync((async) {
+      final controller = GameSessionController(
+        engine: _FakeClearEngine(clearedTiles: 3),
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations.instant(),
+      );
+      addTearDown(controller.dispose);
+
+      controller.startNewGame();
+      async.elapse(const Duration(seconds: 8));
+      expect(controller.state.activeHint, isNotNull);
+
+      controller.noteInteraction();
+      expect(controller.state.activeHint, isNull);
+
+      async.elapse(const Duration(seconds: 7));
+      expect(controller.state.activeHint, isNull);
+
+      async.elapse(const Duration(seconds: 1));
+      expect(controller.state.activeHint, isNotNull);
+    });
+  });
 }
 
 class _FakeRotationEngine extends PuzzleEngine {

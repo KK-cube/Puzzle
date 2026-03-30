@@ -85,6 +85,12 @@ class MoveCommand {
   final RotationDirection? direction;
 }
 
+class BoardHint {
+  const BoardHint({required this.move});
+
+  final MoveCommand move;
+}
+
 class MoveValidation {
   const MoveValidation({
     required this.isValid,

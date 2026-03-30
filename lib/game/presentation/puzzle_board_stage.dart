@@ -30,6 +30,15 @@ class _PuzzleBoardStageState extends ConsumerState<PuzzleBoardStage> {
       initialBoard: widget.state.board,
       dragPreview: _dragPreview,
     );
+    _game.setHint(widget.state.activeHint);
+  }
+
+  @override
+  void didUpdateWidget(covariant PuzzleBoardStage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state.activeHint != widget.state.activeHint) {
+      _game.setHint(widget.state.activeHint);
+    }
   }
 
   @override

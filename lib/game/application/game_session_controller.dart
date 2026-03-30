@@ -52,6 +52,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   final BoardAnimationBus _animationBus;
   final GameSessionDurations durations;
   Timer? _countdownTimer;
+  int _inactiveHintMs = 0;
 
   Future<void> _loadBestScore() async {
     final bestScore = await _highScoreRepository.loadHighScore();
@@ -75,12 +76,14 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       currentChain: 0,
       remainingRotations: kInitialRotationCharges,
       remainingTimeMs: kInitialRunTimeMs,
+      activeHint: null,
       selectedRotationCenter: null,
       inputLocked: false,
       chainBanner: null,
       runEndReason: null,
     );
     _animationBus.emit(BoardAnimationEvent.sync(board));
+    _resetHintTimer(clearHint: true);
     _startCountdown();
   }
 
@@ -92,8 +95,17 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       chainBanner: null,
       selectedRotationCenter: null,
       currentChain: 0,
+      activeHint: null,
       runEndReason: null,
     );
+  }
+
+  void noteInteraction() {
+    if (state.phase != GamePhase.playing) {
+      return;
+    }
+
+    _resetHintTimer(clearHint: true);
   }
 
   void selectRotationCenter(BoardPosition center) {
@@ -149,6 +161,8 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         !state.hasBoard) {
       return;
     }
+
+    _resetHintTimer(clearHint: true);
 
     final originalBoard = cloneBoard(state.board);
     final validation = _engine.validateMove(
@@ -219,6 +233,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     state = state.copyWith(
       board: application.previewBoard,
       remainingRotations: remainingRotations,
+      activeHint: null,
       selectedRotationCenter: null,
     );
 
@@ -249,6 +264,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         score: nextScore,
         currentChain: wave.chainIndex,
         remainingTimeMs: state.remainingTimeMs + timeBonusMs,
+        activeHint: null,
       );
       _animationBus.emit(
         BoardAnimationEvent.transition(
@@ -285,6 +301,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       inputLocked: false,
       chainBanner: null,
       currentChain: 0,
+      activeHint: null,
     );
     _resumeCountdown();
   }
@@ -320,9 +337,28 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     }
 
     state = state.copyWith(remainingTimeMs: nextRemainingTime);
+    _inactiveHintMs += elapsedMs;
+    if (_inactiveHintMs >= kHintDelayMs && state.activeHint == null) {
+      final hint = _buildHint();
+      if (hint != null) {
+        state = state.copyWith(activeHint: hint);
+      }
+    }
     if (nextRemainingTime <= 0) {
       unawaited(_finishRun(state.score, reason: RunEndReason.timeUp));
     }
+  }
+
+  BoardHint? _buildHint() {
+    final moves = _engine.findAvailableMoves(
+      state.board,
+      remainingRotations: state.remainingRotations,
+    );
+    if (moves.isEmpty) {
+      return null;
+    }
+
+    return BoardHint(move: moves.first);
   }
 
   int _timeBonusForClearedTiles(int clearedTiles) {
@@ -337,6 +373,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   Future<void> _finishRun(int score, {required RunEndReason reason}) async {
     _stopCountdown();
+    _resetHintTimer(clearHint: true);
     state = state.copyWith(
       phase: GamePhase.resolving,
       inputLocked: true,
@@ -355,9 +392,17 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       chainBanner: null,
       currentChain: 0,
       remainingTimeMs: state.remainingTimeMs,
+      activeHint: null,
       selectedRotationCenter: null,
       runEndReason: reason,
     );
+  }
+
+  void _resetHintTimer({required bool clearHint}) {
+    _inactiveHintMs = 0;
+    if (clearHint && state.activeHint != null) {
+      state = state.copyWith(activeHint: null);
+    }
   }
 
   @override

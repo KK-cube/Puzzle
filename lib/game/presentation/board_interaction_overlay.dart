@@ -86,6 +86,7 @@ class _BoardInteractionOverlayState
     }
 
     final controller = ref.read(gameSessionControllerProvider.notifier);
+    controller.noteInteraction();
     if (cell.isRotationCenter) {
       controller.selectRotationCenter(cell);
     } else {
@@ -98,6 +99,8 @@ class _BoardInteractionOverlayState
     if (cell == null) {
       return;
     }
+
+    ref.read(gameSessionControllerProvider.notifier).noteInteraction();
 
     setState(() {
       _pendingDrag = _PendingDrag(originCell: cell, startPosition: position);
