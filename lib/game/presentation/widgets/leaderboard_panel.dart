@@ -59,7 +59,12 @@ class LeaderboardPanel extends ConsumerWidget {
             leaderboard.when(
               data: (entries) => entries.isEmpty
                   ? const _LeaderboardNotice(label: 'まだスコアが登録されていません。')
-                  : _LeaderboardEntries(entries: entries, compact: compact),
+                  : Column(
+                      children: [
+                        for (final entry in entries)
+                          _LeaderboardRow(entry: entry, compact: compact),
+                      ],
+                    ),
               loading: () => const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
@@ -76,26 +81,6 @@ class LeaderboardPanel extends ConsumerWidget {
         ],
       ),
     );
-  }
-}
-
-class _LeaderboardEntries extends StatelessWidget {
-  const _LeaderboardEntries({required this.entries, required this.compact});
-
-  final List<LeaderboardEntry> entries;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Column(
-      children: [for (final entry in entries) _LeaderboardRow(entry: entry)],
-    );
-
-    if (!compact || entries.length <= 5) {
-      return content;
-    }
-
-    return SizedBox(height: 300, child: SingleChildScrollView(child: content));
   }
 }
 
@@ -127,9 +112,10 @@ class _LeaderboardNotice extends StatelessWidget {
 }
 
 class _LeaderboardRow extends StatelessWidget {
-  const _LeaderboardRow({required this.entry});
+  const _LeaderboardRow({required this.entry, required this.compact});
 
   final LeaderboardEntry entry;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +128,10 @@ class _LeaderboardRow extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 14,
+        vertical: compact ? 10 : 12,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(18),
@@ -150,10 +139,10 @@ class _LeaderboardRow extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final stacked = constraints.maxWidth < 250;
+          final stacked = constraints.maxWidth < (compact ? 280 : 250);
           final medal = Container(
-            width: 34,
-            height: 34,
+            width: compact ? 30 : 34,
+            height: compact ? 30 : 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: medalColor.withValues(alpha: 0.14),
@@ -161,27 +150,30 @@ class _LeaderboardRow extends StatelessWidget {
             ),
             child: Text(
               '${entry.rank}',
-              style: TextStyle(fontWeight: FontWeight.w900, color: medalColor),
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: medalColor,
+                fontSize: compact ? 13 : 14,
+              ),
             ),
           );
-          final name = Expanded(
-            child: Text(
-              entry.playerName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF172033),
-              ),
+          final name = Text(
+            entry.playerName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: compact ? 15 : 16,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF172033),
             ),
           );
           final score = Text(
             '${entry.score}',
-            style: const TextStyle(
-              fontSize: 18,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: compact ? 16 : 18,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF172033),
+              color: const Color(0xFF172033),
             ),
           );
 
@@ -189,9 +181,15 @@ class _LeaderboardRow extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [medal, const SizedBox(width: 12), name]),
-                const SizedBox(height: 10),
-                score,
+                Row(
+                  children: [
+                    medal,
+                    const SizedBox(width: 10),
+                    Expanded(child: name),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: score),
               ],
             );
           }
@@ -199,10 +197,13 @@ class _LeaderboardRow extends StatelessWidget {
           return Row(
             children: [
               medal,
-              const SizedBox(width: 12),
-              name,
-              const SizedBox(width: 12),
-              score,
+              SizedBox(width: compact ? 10 : 12),
+              Expanded(child: name),
+              SizedBox(width: compact ? 10 : 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(minWidth: compact ? 64 : 72),
+                child: score,
+              ),
             ],
           );
         },

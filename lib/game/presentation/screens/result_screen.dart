@@ -33,64 +33,81 @@ class ResultScreen extends ConsumerWidget {
         ),
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(30),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 48,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF172033),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Container(
+                      padding: const EdgeInsets.all(28),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF172033),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            subtitle,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.5,
+                              color: Color(0xFF556273),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          _ScoreTile(
+                            label: '今回のスコア',
+                            value: '${state.lastRunScore}',
+                          ),
+                          const SizedBox(height: 14),
+                          _ScoreTile(
+                            label: 'ベストスコア',
+                            value: '${state.bestScore}',
+                          ),
+                          const SizedBox(height: 14),
+                          const LeaderboardPanel(compact: true),
+                          const SizedBox(height: 28),
+                          FilledButton.icon(
+                            onPressed: () async {
+                              controller.startNewGame();
+                              unawaited(backgroundMusic.ensurePlaying());
+                            },
+                            icon: const Icon(Icons.replay_rounded),
+                            label: const Text('もう一度'),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: controller.returnToTitle,
+                            icon: const Icon(Icons.home_rounded),
+                            label: const Text('タイトルへ'),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: Color(0xFF556273),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    _ScoreTile(label: '今回のスコア', value: '${state.lastRunScore}'),
-                    const SizedBox(height: 14),
-                    _ScoreTile(label: 'ベストスコア', value: '${state.bestScore}'),
-                    const SizedBox(height: 14),
-                    const LeaderboardPanel(compact: true),
-                    const SizedBox(height: 28),
-                    FilledButton.icon(
-                      onPressed: () async {
-                        controller.startNewGame();
-                        unawaited(backgroundMusic.ensurePlaying());
-                      },
-                      icon: const Icon(Icons.replay_rounded),
-                      label: const Text('もう一度'),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: controller.returnToTitle,
-                      icon: const Icon(Icons.home_rounded),
-                      label: const Text('タイトルへ'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );

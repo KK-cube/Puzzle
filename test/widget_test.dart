@@ -1,15 +1,21 @@
-import 'dart:ui';
+import 'dart:math';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flutter_application_1/app/puzzle_lines_app.dart';
 import 'package:flutter_application_1/app/background_music_controller.dart';
+import 'package:flutter_application_1/game/application/board_animation_bus.dart';
 import 'package:flutter_application_1/game/application/game_providers.dart';
+import 'package:flutter_application_1/game/application/game_session_controller.dart';
+import 'package:flutter_application_1/game/application/game_session_state.dart';
 import 'package:flutter_application_1/game/domain/high_score_repository.dart';
 import 'package:flutter_application_1/game/domain/leaderboard_repository.dart';
 import 'package:flutter_application_1/game/domain/player_nickname_repository.dart';
+import 'package:flutter_application_1/game/domain/puzzle_engine.dart';
 import 'package:flutter_application_1/game/presentation/puzzle_board_stage.dart';
+import 'package:flutter_application_1/game/presentation/screens/result_screen.dart';
 
 void main() {
   testWidgets('title screen starts a run and shows the board HUD', (
@@ -139,4 +145,100 @@ void main() {
     expect(find.text('ニックネームを入力'), findsOneWidget);
     expect(find.text('保存'), findsOneWidget);
   });
+
+  testWidgets(
+    'result screen scrolls and keeps retry and title actions usable on phone',
+    (tester) async {
+      tester.view.physicalSize = const Size(1170, 1794);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = _ResultGameSessionController();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            gameSessionControllerProvider.overrideWith((ref) => controller),
+            backgroundMusicControllerProvider.overrideWithValue(
+              SilentBackgroundMusicController(),
+            ),
+            leaderboardRepositoryProvider.overrideWithValue(
+              InMemoryLeaderboardRepository(
+                seedSubmissions: [
+                  for (var index = 0; index < 10; index += 1)
+                    LeaderboardSubmission(
+                      playerName: 'Player ${index + 1}',
+                      score: 5000 - (index * 150),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: Scaffold(body: ResultScreen())),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final scrollable = find.byType(Scrollable).first;
+      await tester.dragUntilVisible(
+        find.text('もう一度'),
+        scrollable,
+        const Offset(0, -200),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('もう一度'));
+      await tester.pump();
+      expect(controller.state.phase, GamePhase.playing);
+
+      controller.showResult();
+      await tester.pump();
+      await tester.dragUntilVisible(
+        find.text('タイトルへ'),
+        scrollable,
+        const Offset(0, -200),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('タイトルへ'));
+      await tester.pump();
+      expect(controller.state.phase, GamePhase.title);
+    },
+  );
+}
+
+class _ResultGameSessionController extends GameSessionController {
+  _ResultGameSessionController()
+    : super(
+        engine: PuzzleEngine(random: Random(7)),
+        highScoreRepository: InMemoryHighScoreRepository(1200),
+        animationBus: BoardAnimationBus(),
+        random: Random(1),
+        durations: const GameSessionDurations.instant(),
+      ) {
+    showResult();
+  }
+
+  void showResult() {
+    final board = PuzzleEngine(
+      random: Random(9),
+    ).createInitialBoard(remainingRotations: 0);
+    state = state.copyWith(
+      phase: GamePhase.result,
+      board: board,
+      score: 980,
+      bestScore: 1200,
+      lastRunScore: 980,
+      currentChain: 0,
+      remainingRotations: 0,
+      remainingTimeMs: 0,
+      activeHint: null,
+      selectedRotationCenter: null,
+      inputLocked: false,
+      chainBanner: null,
+      runEndReason: RunEndReason.timeUp,
+    );
+  }
 }
