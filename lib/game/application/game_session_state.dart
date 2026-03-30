@@ -2,6 +2,10 @@ import '../domain/models.dart';
 
 enum GamePhase { title, playing, resolving, result }
 
+enum RunEndReason { noMoreMoves, timeUp }
+
+const kInitialRunTimeMs = 30000;
+
 const _unset = Object();
 
 class GameSessionState {
@@ -13,9 +17,11 @@ class GameSessionState {
     required this.lastRunScore,
     required this.currentChain,
     required this.remainingRotations,
+    required this.remainingTimeMs,
     required this.selectedRotationCenter,
     required this.inputLocked,
     required this.chainBanner,
+    required this.runEndReason,
   });
 
   const GameSessionState.initial()
@@ -26,9 +32,11 @@ class GameSessionState {
       lastRunScore = 0,
       currentChain = 0,
       remainingRotations = kInitialRotationCharges,
+      remainingTimeMs = kInitialRunTimeMs,
       selectedRotationCenter = null,
       inputLocked = false,
-      chainBanner = null;
+      chainBanner = null,
+      runEndReason = null;
 
   final GamePhase phase;
   final BoardMatrix board;
@@ -37,9 +45,11 @@ class GameSessionState {
   final int lastRunScore;
   final int currentChain;
   final int remainingRotations;
+  final int remainingTimeMs;
   final BoardPosition? selectedRotationCenter;
   final bool inputLocked;
   final String? chainBanner;
+  final RunEndReason? runEndReason;
 
   bool get hasBoard => board.isNotEmpty;
 
@@ -51,9 +61,11 @@ class GameSessionState {
     int? lastRunScore,
     int? currentChain,
     int? remainingRotations,
+    int? remainingTimeMs,
     Object? selectedRotationCenter = _unset,
     bool? inputLocked,
     Object? chainBanner = _unset,
+    Object? runEndReason = _unset,
   }) {
     return GameSessionState(
       phase: phase ?? this.phase,
@@ -63,6 +75,7 @@ class GameSessionState {
       lastRunScore: lastRunScore ?? this.lastRunScore,
       currentChain: currentChain ?? this.currentChain,
       remainingRotations: remainingRotations ?? this.remainingRotations,
+      remainingTimeMs: remainingTimeMs ?? this.remainingTimeMs,
       selectedRotationCenter: identical(selectedRotationCenter, _unset)
           ? this.selectedRotationCenter
           : selectedRotationCenter as BoardPosition?,
@@ -70,6 +83,9 @@ class GameSessionState {
       chainBanner: identical(chainBanner, _unset)
           ? this.chainBanner
           : chainBanner as String?,
+      runEndReason: identical(runEndReason, _unset)
+          ? this.runEndReason
+          : runEndReason as RunEndReason?,
     );
   }
 }

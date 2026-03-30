@@ -70,7 +70,9 @@ void main() {
     expect(find.text('Rotate CW'), findsOneWidget);
     expect(find.text('Rotations'), findsOneWidget);
     expect(
-      find.text('Drag left to swap rows. Drag top to swap columns.'),
+      find.text(
+        'Drag any tile sideways to slide its column, or vertically to slide its row.',
+      ),
       findsOneWidget,
     );
 

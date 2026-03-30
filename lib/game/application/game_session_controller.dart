@@ -15,6 +15,7 @@ class GameSessionDurations {
     this.clear = const Duration(milliseconds: 200),
     this.settle = const Duration(milliseconds: 260),
     this.chainBannerHold = const Duration(milliseconds: 420),
+    this.timerTick = const Duration(milliseconds: 100),
   });
 
   const GameSessionDurations.instant()
@@ -22,13 +23,15 @@ class GameSessionDurations {
       revert = Duration.zero,
       clear = Duration.zero,
       settle = Duration.zero,
-      chainBannerHold = Duration.zero;
+      chainBannerHold = Duration.zero,
+      timerTick = const Duration(milliseconds: 100);
 
   final Duration move;
   final Duration revert;
   final Duration clear;
   final Duration settle;
   final Duration chainBannerHold;
+  final Duration timerTick;
 }
 
 class GameSessionController extends StateNotifier<GameSessionState> {
@@ -48,6 +51,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   final HighScoreRepository _highScoreRepository;
   final BoardAnimationBus _animationBus;
   final GameSessionDurations durations;
+  Timer? _countdownTimer;
 
   Future<void> _loadBestScore() async {
     final bestScore = await _highScoreRepository.loadHighScore();
@@ -59,6 +63,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   void startNewGame() {
+    _stopCountdown();
     final board = _engine.createInitialBoard(
       remainingRotations: kInitialRotationCharges,
     );
@@ -69,20 +74,25 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       lastRunScore: 0,
       currentChain: 0,
       remainingRotations: kInitialRotationCharges,
+      remainingTimeMs: kInitialRunTimeMs,
       selectedRotationCenter: null,
       inputLocked: false,
       chainBanner: null,
+      runEndReason: null,
     );
     _animationBus.emit(BoardAnimationEvent.sync(board));
+    _startCountdown();
   }
 
   void returnToTitle() {
+    _stopCountdown();
     state = state.copyWith(
       phase: GamePhase.title,
       inputLocked: false,
       chainBanner: null,
       selectedRotationCenter: null,
       currentChain: 0,
+      runEndReason: null,
     );
   }
 
@@ -229,6 +239,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       await Future<void>.delayed(durations.clear);
 
       nextScore += wave.scoreDelta;
+      final timeBonusMs = _timeBonusForClearedTiles(wave.clearedTileIds.length);
       if (!mounted) {
         return;
       }
@@ -237,6 +248,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         board: wave.boardAfterRefill,
         score: nextScore,
         currentChain: wave.chainIndex,
+        remainingTimeMs: state.remainingTimeMs + timeBonusMs,
       );
       _animationBus.emit(
         BoardAnimationEvent.transition(
@@ -264,7 +276,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       remainingRotations: remainingRotations,
     );
     if (availableMoves.isEmpty) {
-      await _finishRun(nextScore);
+      await _finishRun(nextScore, reason: RunEndReason.noMoreMoves);
       return;
     }
 
@@ -274,9 +286,62 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       chainBanner: null,
       currentChain: 0,
     );
+    _resumeCountdown();
   }
 
-  Future<void> _finishRun(int score) async {
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(durations.timerTick, (_) => _tickTimer());
+  }
+
+  void _resumeCountdown() {}
+
+  void _stopCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+  }
+
+  void _tickTimer() {
+    if (!mounted || state.phase != GamePhase.playing || state.inputLocked) {
+      return;
+    }
+
+    final elapsedMs = durations.timerTick.inMilliseconds;
+    if (elapsedMs <= 0) {
+      return;
+    }
+
+    final nextRemainingTime = (state.remainingTimeMs - elapsedMs).clamp(
+      0,
+      1 << 31,
+    );
+    if (nextRemainingTime == state.remainingTimeMs) {
+      return;
+    }
+
+    state = state.copyWith(remainingTimeMs: nextRemainingTime);
+    if (nextRemainingTime <= 0) {
+      unawaited(_finishRun(state.score, reason: RunEndReason.timeUp));
+    }
+  }
+
+  int _timeBonusForClearedTiles(int clearedTiles) {
+    if (clearedTiles >= 4) {
+      return 2000;
+    }
+    if (clearedTiles >= 3) {
+      return 1000;
+    }
+    return 0;
+  }
+
+  Future<void> _finishRun(int score, {required RunEndReason reason}) async {
+    _stopCountdown();
+    state = state.copyWith(
+      phase: GamePhase.resolving,
+      inputLocked: true,
+      remainingTimeMs: state.remainingTimeMs.clamp(0, kInitialRunTimeMs * 10),
+    );
     final bestScore = await _highScoreRepository.saveIfHigher(score);
     if (!mounted) {
       return;
@@ -289,7 +354,15 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       inputLocked: false,
       chainBanner: null,
       currentChain: 0,
+      remainingTimeMs: state.remainingTimeMs,
       selectedRotationCenter: null,
+      runEndReason: reason,
     );
+  }
+
+  @override
+  void dispose() {
+    _stopCountdown();
+    super.dispose();
   }
 }

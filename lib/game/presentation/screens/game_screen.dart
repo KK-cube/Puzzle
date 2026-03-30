@@ -97,6 +97,11 @@ class GameScreen extends ConsumerWidget {
         state.selectedRotationCenter != null &&
         state.remainingRotations > 0;
   }
+
+  static String _formatTime(int milliseconds) {
+    final seconds = milliseconds / 1000;
+    return '${seconds.toStringAsFixed(1)}s';
+  }
 }
 
 class _HudSection extends StatelessWidget {
@@ -128,6 +133,14 @@ class _HudSection extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _HudChip(
+              label: 'Time',
+              value: GameScreen._formatTime(state.remainingTimeMs),
+              compact: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _HudChip(
               label: 'Rotations',
               value: '${state.remainingRotations}',
               compact: true,
@@ -144,6 +157,10 @@ class _HudSection extends StatelessWidget {
       children: [
         _HudChip(label: 'Score', value: '${state.score}'),
         _HudChip(label: 'Best', value: '${state.bestScore}'),
+        _HudChip(
+          label: 'Time',
+          value: GameScreen._formatTime(state.remainingTimeMs),
+        ),
         _HudChip(label: 'Rotations', value: '${state.remainingRotations}'),
       ],
     );
@@ -259,8 +276,8 @@ class _ControlPanel extends StatelessWidget {
           SizedBox(height: compact ? 6 : 8),
           Text(
             compact
-                ? 'Drag left to swap rows. Drag top to swap columns.'
-                : 'Drag the left rail to swap rows. Drag the top rail to swap columns. Invalid moves animate and snap back.',
+                ? 'Drag any tile sideways to slide its column, or vertically to slide its row.'
+                : 'Drag tiles directly: sideways slides a column, vertical movement slides a row. Invalid moves animate and snap back.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: compact ? 12 : 13,

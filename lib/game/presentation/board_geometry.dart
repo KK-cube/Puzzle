@@ -12,37 +12,22 @@ class BoardGeometry {
   final Size _size;
 
   late final double outerPadding = clampDouble(boardSize * 0.024, 8, 16);
-  late final double leftGutter = clampDouble(boardSize * 0.098, 26, 42);
-  late final double topGutter = clampDouble(boardSize * 0.098, 26, 42);
-  late final double boardSide =
-      boardSize - (outerPadding * 2) - math.max(leftGutter, topGutter);
+  late final double boardSide = boardSize - (outerPadding * 2);
   late final double cellSize = boardSide / kBoardSize;
-  late final double handleInset = clampDouble(
-    math.min(leftGutter, topGutter) * 0.18,
-    4,
-    9,
+  late final double dragActivationDistance = clampDouble(
+    cellSize * 0.2,
+    10,
+    18,
   );
   late final Offset origin = Offset(
     (_size.width - boardSize) / 2,
     (_size.height - boardSize) / 2,
   );
   late final Rect boardRect = Rect.fromLTWH(
-    origin.dx + outerPadding + leftGutter,
-    origin.dy + outerPadding + topGutter,
-    boardSide,
-    boardSide,
-  );
-  late final Rect rowGutterRect = Rect.fromLTWH(
     origin.dx + outerPadding,
-    boardRect.top,
-    leftGutter,
-    boardSide,
-  );
-  late final Rect columnGutterRect = Rect.fromLTWH(
-    boardRect.left,
     origin.dy + outerPadding,
     boardSide,
-    topGutter,
+    boardSide,
   );
 
   Rect cellRect(int row, int column) {
@@ -54,21 +39,21 @@ class BoardGeometry {
     );
   }
 
-  Rect rowHandleRect(int row) {
+  Rect rowRect(int row) {
     return Rect.fromLTWH(
-      rowGutterRect.left,
+      boardRect.left,
       boardRect.top + (row * cellSize),
-      rowGutterRect.width,
+      boardRect.width,
       cellSize,
     );
   }
 
-  Rect columnHandleRect(int column) {
+  Rect columnRect(int column) {
     return Rect.fromLTWH(
       boardRect.left + (column * cellSize),
-      columnGutterRect.top,
+      boardRect.top,
       cellSize,
-      columnGutterRect.height,
+      boardRect.height,
     );
   }
 
@@ -86,23 +71,37 @@ class BoardGeometry {
     return BoardPosition(row, column);
   }
 
-  int? rowHandleAt(Offset point) {
-    if (!rowGutterRect.inflate(cellSize * 0.25).contains(point)) {
-      return null;
-    }
-
-    final row = ((point.dy - boardRect.top) / cellSize).floor();
-    return _isBoardIndex(row) ? row : null;
+  double clampRowOffset(int row, double offset) {
+    return clampDouble(
+      offset,
+      -(row * cellSize),
+      (kBoardSize - 1 - row) * cellSize,
+    );
   }
 
-  int? columnHandleAt(Offset point) {
-    if (!columnGutterRect.inflate(cellSize * 0.25).contains(point)) {
-      return null;
-    }
+  double clampColumnOffset(int column, double offset) {
+    return clampDouble(
+      offset,
+      -(column * cellSize),
+      (kBoardSize - 1 - column) * cellSize,
+    );
+  }
 
-    final column = ((point.dx - boardRect.left) / cellSize).floor();
-    return _isBoardIndex(column) ? column : null;
+  int nearestRowForOffset(int sourceRow, double offset) {
+    final y = rowCenter(sourceRow) + clampRowOffset(sourceRow, offset);
+    return ((y - boardRect.top) / cellSize).round().clamp(0, kBoardSize - 1);
+  }
+
+  int nearestColumnForOffset(int sourceColumn, double offset) {
+    final x =
+        columnCenter(sourceColumn) + clampColumnOffset(sourceColumn, offset);
+    return ((x - boardRect.left) / cellSize).round().clamp(0, kBoardSize - 1);
   }
 
   bool _isBoardIndex(int value) => value >= 0 && value < kBoardSize;
+
+  double rowCenter(int row) => boardRect.top + ((row + 0.5) * cellSize);
+
+  double columnCenter(int column) =>
+      boardRect.left + ((column + 0.5) * cellSize);
 }

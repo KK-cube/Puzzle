@@ -62,7 +62,7 @@ class TitleScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          'Drag the row and column handles, build matches of three, and spend your three 3x3 rotations where they matter most.',
+                          'You have 30 seconds. Drag tiles directly to swap lines, build matches, and earn bonus time with bigger clears.',
                           style: TextStyle(
                             fontSize: 18,
                             height: 1.4,
@@ -78,6 +78,7 @@ class TitleScreen extends ConsumerWidget {
                               label: 'Best Score',
                               value: '${state.bestScore}',
                             ),
+                            const _InfoCard(label: 'Timer', value: '30 sec'),
                             const _InfoCard(label: 'Board', value: '7 x 7'),
                             const _InfoCard(
                               label: 'Rotations',
@@ -105,7 +106,7 @@ class TitleScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 18),
                         const Text(
-                          'Row swap: drag from the left rail. Column swap: drag from the top rail. Rotation: tap a center tile, then use the CW / CCW buttons.',
+                          'Clear 3 tiles for +1 second. Clear 4 or more tiles in one wave for +2 seconds. Rotations still use the center-tap plus CW / CCW buttons.',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,

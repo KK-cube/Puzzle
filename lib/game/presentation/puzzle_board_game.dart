@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../application/board_animation_bus.dart';
 import '../domain/models.dart';
+import 'board_drag_preview.dart';
 import 'board_geometry.dart';
 import 'tile_palette.dart';
 
@@ -13,9 +15,11 @@ class PuzzleBoardGame extends FlameGame {
   PuzzleBoardGame({
     required this.animationBus,
     required BoardMatrix initialBoard,
+    required this.dragPreview,
   }) : _currentBoard = cloneBoard(initialBoard);
 
   final BoardAnimationBus animationBus;
+  final ValueListenable<BoardDragPreview?> dragPreview;
   final Map<int, _TileVisual> _visuals = {};
   BoardMatrix _currentBoard;
   StreamSubscription<BoardAnimationEvent>? _subscription;
@@ -55,10 +59,21 @@ class PuzzleBoardGame extends FlameGame {
     _renderBackdrop(canvas, geometry);
     _renderCells(canvas, geometry);
 
+    final preview = dragPreview.value;
+    final activeTileIds = _activeTileIds(preview);
     final visuals = _visuals.values.toList()
       ..sort((left, right) => left.opacity.compareTo(right.opacity));
     for (final visual in visuals) {
+      if (activeTileIds.contains(visual.tile.id)) {
+        continue;
+      }
       _renderTile(canvas, geometry, visual);
+    }
+    for (final visual in visuals) {
+      if (!activeTileIds.contains(visual.tile.id)) {
+        continue;
+      }
+      _renderTile(canvas, geometry, visual, preview: preview);
     }
   }
 
@@ -208,22 +223,6 @@ class PuzzleBoardGame extends FlameGame {
       boardPaint,
     );
 
-    final handlePaint = Paint()..color = Colors.white.withValues(alpha: 0.14);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        geometry.rowGutterRect,
-        const Radius.circular(22),
-      ),
-      handlePaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        geometry.columnGutterRect,
-        const Radius.circular(22),
-      ),
-      handlePaint,
-    );
-
     final gridPaint = Paint()..color = Colors.white.withValues(alpha: 0.08);
     for (var row = 0; row < kBoardSize; row++) {
       for (var column = 0; column < kBoardSize; column++) {
@@ -236,14 +235,31 @@ class PuzzleBoardGame extends FlameGame {
     }
   }
 
-  void _renderTile(Canvas canvas, BoardGeometry geometry, _TileVisual visual) {
+  void _renderTile(
+    Canvas canvas,
+    BoardGeometry geometry,
+    _TileVisual visual, {
+    BoardDragPreview? preview,
+  }) {
     if (visual.opacity <= 0) {
       return;
     }
 
+    final horizontalOffset = preview?.axis == BoardDragAxis.column
+        ? preview!.offset
+        : 0.0;
+    final verticalOffset = preview?.axis == BoardDragAxis.row
+        ? preview!.offset
+        : 0.0;
     final rect = Rect.fromLTWH(
-      geometry.boardRect.left + (visual.column * geometry.cellSize) + 6,
-      geometry.boardRect.top + (visual.row * geometry.cellSize) + 6,
+      geometry.boardRect.left +
+          (visual.column * geometry.cellSize) +
+          horizontalOffset +
+          6,
+      geometry.boardRect.top +
+          (visual.row * geometry.cellSize) +
+          verticalOffset +
+          6,
       geometry.cellSize - 12,
       geometry.cellSize - 12,
     );
@@ -283,6 +299,24 @@ class PuzzleBoardGame extends FlameGame {
       gleamPaint,
     );
     canvas.restore();
+  }
+
+  Set<int> _activeTileIds(BoardDragPreview? preview) {
+    if (preview == null) {
+      return const <int>{};
+    }
+
+    if (preview.axis == BoardDragAxis.row) {
+      return {
+        for (var column = 0; column < kBoardSize; column++)
+          _currentBoard[preview.sourceIndex][column].id,
+      };
+    }
+
+    return {
+      for (var row = 0; row < kBoardSize; row++)
+        _currentBoard[row][preview.sourceIndex].id,
+    };
   }
 }
 

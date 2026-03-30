@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/game_providers.dart';
 import '../application/game_session_state.dart';
+import 'board_drag_preview.dart';
 import 'board_interaction_overlay.dart';
 import 'puzzle_board_game.dart';
 
@@ -18,14 +19,23 @@ class PuzzleBoardStage extends ConsumerStatefulWidget {
 
 class _PuzzleBoardStageState extends ConsumerState<PuzzleBoardStage> {
   late final PuzzleBoardGame _game;
+  late final ValueNotifier<BoardDragPreview?> _dragPreview;
 
   @override
   void initState() {
     super.initState();
+    _dragPreview = ValueNotifier<BoardDragPreview?>(null);
     _game = PuzzleBoardGame(
       animationBus: ref.read(boardAnimationBusProvider),
       initialBoard: widget.state.board,
+      dragPreview: _dragPreview,
     );
+  }
+
+  @override
+  void dispose() {
+    _dragPreview.dispose();
+    super.dispose();
   }
 
   @override
@@ -57,7 +67,10 @@ class _PuzzleBoardStageState extends ConsumerState<PuzzleBoardStage> {
                   fit: StackFit.expand,
                   children: [
                     GameWidget(game: _game),
-                    BoardInteractionOverlay(state: widget.state),
+                    BoardInteractionOverlay(
+                      state: widget.state,
+                      dragPreview: _dragPreview,
+                    ),
                   ],
                 ),
               ),

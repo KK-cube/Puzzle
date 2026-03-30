@@ -4,12 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/game_providers.dart';
 import '../application/game_session_state.dart';
 import '../domain/models.dart';
+import 'board_drag_preview.dart';
 import 'board_geometry.dart';
 
 class BoardInteractionOverlay extends ConsumerStatefulWidget {
-  const BoardInteractionOverlay({super.key, required this.state});
+  const BoardInteractionOverlay({
+    super.key,
+    required this.state,
+    required this.dragPreview,
+  });
 
   final GameSessionState state;
+  final ValueNotifier<BoardDragPreview?> dragPreview;
 
   @override
   ConsumerState<BoardInteractionOverlay> createState() =>
@@ -18,9 +24,23 @@ class BoardInteractionOverlay extends ConsumerStatefulWidget {
 
 class _BoardInteractionOverlayState
     extends ConsumerState<BoardInteractionOverlay> {
-  _DragAxis? _dragAxis;
-  int? _dragFrom;
-  int? _dragTo;
+  _PendingDrag? _pendingDrag;
+  _ActiveDrag? _activeDrag;
+
+  @override
+  void didUpdateWidget(covariant BoardInteractionOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.state.inputLocked &&
+        (_pendingDrag != null || _activeDrag != null)) {
+      _clearDragState();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.dragPreview.value = null;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +67,7 @@ class _BoardInteractionOverlayState
             painter: _InteractionPainter(
               geometry: geometry,
               state: widget.state,
-              dragAxis: _dragAxis,
-              dragFrom: _dragFrom,
-              dragTo: _dragTo,
+              dragPreview: widget.dragPreview.value,
             ),
           ),
         );
@@ -58,6 +76,10 @@ class _BoardInteractionOverlayState
   }
 
   void _handleTap(Offset position, BoardGeometry geometry) {
+    if (_pendingDrag != null || _activeDrag != null) {
+      return;
+    }
+
     final cell = geometry.cellAt(position);
     if (cell == null) {
       return;
@@ -72,128 +94,203 @@ class _BoardInteractionOverlayState
   }
 
   void _handlePanStart(Offset position, BoardGeometry geometry) {
-    final rowHandle = geometry.rowHandleAt(position);
-    if (rowHandle != null) {
-      setState(() {
-        _dragAxis = _DragAxis.row;
-        _dragFrom = rowHandle;
-        _dragTo = rowHandle;
-      });
-      return;
-    }
-
-    final columnHandle = geometry.columnHandleAt(position);
-    if (columnHandle != null) {
-      setState(() {
-        _dragAxis = _DragAxis.column;
-        _dragFrom = columnHandle;
-        _dragTo = columnHandle;
-      });
-    }
-  }
-
-  void _handlePanUpdate(Offset position, BoardGeometry geometry) {
-    if (_dragAxis == null) {
-      return;
-    }
-
-    if (_dragAxis == _DragAxis.row) {
-      final row =
-          geometry.rowHandleAt(position) ?? geometry.cellAt(position)?.row;
-      if (row != null) {
-        setState(() => _dragTo = row);
-      }
-    } else {
-      final column =
-          geometry.columnHandleAt(position) ??
-          geometry.cellAt(position)?.column;
-      if (column != null) {
-        setState(() => _dragTo = column);
-      }
-    }
-  }
-
-  void _handlePanEnd() {
-    final axis = _dragAxis;
-    final from = _dragFrom;
-    final to = _dragTo;
-    _clearDragState();
-
-    if (axis == null || from == null || to == null || from == to) {
-      return;
-    }
-
-    final controller = ref.read(gameSessionControllerProvider.notifier);
-    if (axis == _DragAxis.row) {
-      controller.swapRows(from, to);
-    } else {
-      controller.swapColumns(from, to);
-    }
-  }
-
-  void _clearDragState() {
-    if (_dragAxis == null && _dragFrom == null && _dragTo == null) {
+    final cell = geometry.cellAt(position);
+    if (cell == null) {
       return;
     }
 
     setState(() {
-      _dragAxis = null;
-      _dragFrom = null;
-      _dragTo = null;
+      _pendingDrag = _PendingDrag(originCell: cell, startPosition: position);
+      _activeDrag = null;
+    });
+  }
+
+  void _handlePanUpdate(Offset position, BoardGeometry geometry) {
+    final pendingDrag = _pendingDrag;
+    if (pendingDrag != null) {
+      final delta = position - pendingDrag.startPosition;
+      if (delta.distance < geometry.dragActivationDistance) {
+        return;
+      }
+
+      final axis = delta.dx.abs() >= delta.dy.abs()
+          ? BoardDragAxis.column
+          : BoardDragAxis.row;
+      final sourceIndex = axis == BoardDragAxis.column
+          ? pendingDrag.originCell.column
+          : pendingDrag.originCell.row;
+      ref.read(gameSessionControllerProvider.notifier).clearRotationSelection();
+      setState(() {
+        _pendingDrag = null;
+        _activeDrag = _ActiveDrag(
+          axis: axis,
+          sourceIndex: sourceIndex,
+          startPosition: pendingDrag.startPosition,
+          targetIndex: sourceIndex,
+          offset: 0,
+        );
+      });
+    }
+
+    final activeDrag = _activeDrag;
+    if (activeDrag == null) {
+      return;
+    }
+
+    final rawOffset = activeDrag.axis == BoardDragAxis.row
+        ? position.dy - activeDrag.startPosition.dy
+        : position.dx - activeDrag.startPosition.dx;
+    final clampedOffset = activeDrag.axis == BoardDragAxis.row
+        ? geometry.clampRowOffset(activeDrag.sourceIndex, rawOffset)
+        : geometry.clampColumnOffset(activeDrag.sourceIndex, rawOffset);
+    final targetIndex = activeDrag.axis == BoardDragAxis.row
+        ? geometry.nearestRowForOffset(activeDrag.sourceIndex, clampedOffset)
+        : geometry.nearestColumnForOffset(
+            activeDrag.sourceIndex,
+            clampedOffset,
+          );
+    final preview = BoardDragPreview(
+      axis: activeDrag.axis,
+      sourceIndex: activeDrag.sourceIndex,
+      targetIndex: targetIndex,
+      offset: clampedOffset,
+    );
+
+    widget.dragPreview.value = preview;
+    setState(() {
+      _activeDrag = activeDrag.copyWith(
+        targetIndex: targetIndex,
+        offset: clampedOffset,
+      );
+    });
+  }
+
+  void _handlePanEnd() {
+    final activeDrag = _activeDrag;
+    _clearDragState();
+
+    if (activeDrag == null ||
+        activeDrag.sourceIndex == activeDrag.targetIndex) {
+      return;
+    }
+
+    final controller = ref.read(gameSessionControllerProvider.notifier);
+    if (activeDrag.axis == BoardDragAxis.row) {
+      controller.swapRows(activeDrag.sourceIndex, activeDrag.targetIndex);
+    } else {
+      controller.swapColumns(activeDrag.sourceIndex, activeDrag.targetIndex);
+    }
+  }
+
+  void _clearDragState() {
+    if (_pendingDrag == null &&
+        _activeDrag == null &&
+        widget.dragPreview.value == null) {
+      return;
+    }
+
+    widget.dragPreview.value = null;
+    setState(() {
+      _pendingDrag = null;
+      _activeDrag = null;
     });
   }
 }
 
-enum _DragAxis { row, column }
+class _PendingDrag {
+  const _PendingDrag({required this.originCell, required this.startPosition});
+
+  final BoardPosition originCell;
+  final Offset startPosition;
+}
+
+class _ActiveDrag {
+  const _ActiveDrag({
+    required this.axis,
+    required this.sourceIndex,
+    required this.startPosition,
+    required this.targetIndex,
+    required this.offset,
+  });
+
+  final BoardDragAxis axis;
+  final int sourceIndex;
+  final Offset startPosition;
+  final int targetIndex;
+  final double offset;
+
+  _ActiveDrag copyWith({int? targetIndex, double? offset}) {
+    return _ActiveDrag(
+      axis: axis,
+      sourceIndex: sourceIndex,
+      startPosition: startPosition,
+      targetIndex: targetIndex ?? this.targetIndex,
+      offset: offset ?? this.offset,
+    );
+  }
+}
 
 class _InteractionPainter extends CustomPainter {
   const _InteractionPainter({
     required this.geometry,
     required this.state,
-    required this.dragAxis,
-    required this.dragFrom,
-    required this.dragTo,
+    required this.dragPreview,
   });
 
   final BoardGeometry geometry;
   final GameSessionState state;
-  final _DragAxis? dragAxis;
-  final int? dragFrom;
-  final int? dragTo;
+  final BoardDragPreview? dragPreview;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final guidePaint = Paint()..color = Colors.white.withValues(alpha: 0.18);
-    final activePaint = Paint()
-      ..color = const Color(0xFFF97316).withValues(alpha: 0.72);
     final focusPaint = Paint()
       ..color = const Color(0xFFF8FAFC).withValues(alpha: 0.32)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
-    final handleInset = geometry.handleInset;
+    final targetFillPaint = Paint()
+      ..color = const Color(0xFFF97316).withValues(alpha: 0.16);
+    final targetStrokePaint = Paint()
+      ..color = const Color(0xFFF97316).withValues(alpha: 0.72)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    final activeStrokePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.44)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
 
-    for (var row = 0; row < kBoardSize; row++) {
-      final rect = geometry.rowHandleRect(row).deflate(handleInset);
-      final paint =
-          dragAxis == _DragAxis.row && (row == dragFrom || row == dragTo)
-          ? activePaint
-          : guidePaint;
+    final preview = dragPreview;
+    if (preview != null) {
+      final targetRect = preview.axis == BoardDragAxis.row
+          ? geometry.rowRect(preview.targetIndex)
+          : geometry.columnRect(preview.targetIndex);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(14)),
-        paint,
+        RRect.fromRectAndRadius(
+          targetRect.deflate(4),
+          const Radius.circular(18),
+        ),
+        targetFillPaint,
       );
-    }
-
-    for (var column = 0; column < kBoardSize; column++) {
-      final rect = geometry.columnHandleRect(column).deflate(handleInset);
-      final paint =
-          dragAxis == _DragAxis.column &&
-              (column == dragFrom || column == dragTo)
-          ? activePaint
-          : guidePaint;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(14)),
-        paint,
+        RRect.fromRectAndRadius(
+          targetRect.deflate(4),
+          const Radius.circular(18),
+        ),
+        targetStrokePaint,
+      );
+
+      final draggedRect = preview.axis == BoardDragAxis.row
+          ? geometry
+                .rowRect(preview.sourceIndex)
+                .shift(Offset(0, preview.offset))
+          : geometry
+                .columnRect(preview.sourceIndex)
+                .shift(Offset(preview.offset, 0));
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          draggedRect.deflate(5),
+          const Radius.circular(18),
+        ),
+        activeStrokePaint,
       );
     }
 
@@ -226,9 +323,7 @@ class _InteractionPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _InteractionPainter oldDelegate) {
-    return oldDelegate.dragAxis != dragAxis ||
-        oldDelegate.dragFrom != dragFrom ||
-        oldDelegate.dragTo != dragTo ||
+    return oldDelegate.dragPreview != dragPreview ||
         oldDelegate.state.selectedRotationCenter !=
             state.selectedRotationCenter ||
         oldDelegate.state.inputLocked != state.inputLocked;

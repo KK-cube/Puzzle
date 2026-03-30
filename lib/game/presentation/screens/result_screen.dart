@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/game_providers.dart';
+import '../../application/game_session_state.dart';
 
 class ResultScreen extends ConsumerWidget {
   const ResultScreen({super.key});
@@ -10,6 +11,15 @@ class ResultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameSessionControllerProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
+    final title = switch (state.runEndReason) {
+      RunEndReason.timeUp => 'Time Up',
+      _ => 'No More Moves',
+    };
+    final subtitle = switch (state.runEndReason) {
+      RunEndReason.timeUp =>
+        'The clock hit zero. Chain quickly and keep extending your run with match bonuses.',
+      _ => 'Your board is stable and every swap or rotation is exhausted.',
+    };
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -34,19 +44,19 @@ class ResultScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'No More Moves',
-                      style: TextStyle(
+                    Text(
+                      title,
+                      style: const TextStyle(
                         fontSize: 34,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF172033),
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text(
-                      'Your board is stable and every swap or rotation is exhausted.',
+                    Text(
+                      subtitle,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         height: 1.5,
                         color: Color(0xFF556273),

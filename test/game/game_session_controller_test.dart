@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter_application_1/game/application/board_animation_bus.dart';
@@ -20,6 +21,7 @@ void main() {
         animationBus: BoardAnimationBus(),
         durations: const GameSessionDurations.instant(),
       );
+      addTearDown(controller.dispose);
 
       controller.startNewGame();
 
@@ -51,6 +53,7 @@ void main() {
       animationBus: BoardAnimationBus(),
       durations: const GameSessionDurations.instant(),
     );
+    addTearDown(controller.dispose);
 
     controller.startNewGame();
     controller.selectRotationCenter(const BoardPosition(1, 1));
@@ -59,6 +62,59 @@ void main() {
     expect(controller.state.remainingRotations, kInitialRotationCharges);
     expect(controller.state.phase, GamePhase.playing);
     expect(engine.applyMoveCalls, 0);
+  });
+
+  test('run starts at 30 seconds and ends when the timer reaches zero', () {
+    fakeAsync((async) {
+      final controller = GameSessionController(
+        engine: _FakeClearEngine(clearedTiles: 3),
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations.instant(),
+      );
+      addTearDown(controller.dispose);
+
+      controller.startNewGame();
+      async.flushMicrotasks();
+
+      expect(controller.state.remainingTimeMs, kInitialRunTimeMs);
+
+      async.elapse(const Duration(seconds: 1));
+      expect(controller.state.remainingTimeMs, 29000);
+
+      async.elapse(const Duration(seconds: 29));
+      async.flushMicrotasks();
+
+      expect(controller.state.remainingTimeMs, 0);
+      expect(controller.state.phase, GamePhase.result);
+      expect(controller.state.runEndReason, RunEndReason.timeUp);
+    });
+  });
+
+  test('clearing three and four tiles grants time bonuses', () async {
+    final threeTileController = GameSessionController(
+      engine: _FakeClearEngine(clearedTiles: 3),
+      highScoreRepository: InMemoryHighScoreRepository(),
+      animationBus: BoardAnimationBus(),
+      durations: const GameSessionDurations.instant(),
+    );
+    addTearDown(threeTileController.dispose);
+    threeTileController.startNewGame();
+
+    await threeTileController.swapRows(0, 1);
+    expect(threeTileController.state.remainingTimeMs, 31000);
+
+    final fourTileController = GameSessionController(
+      engine: _FakeClearEngine(clearedTiles: 4),
+      highScoreRepository: InMemoryHighScoreRepository(),
+      animationBus: BoardAnimationBus(),
+      durations: const GameSessionDurations.instant(),
+    );
+    addTearDown(fourTileController.dispose);
+    fourTileController.startNewGame();
+
+    await fourTileController.swapRows(0, 1);
+    expect(fourTileController.state.remainingTimeMs, 32000);
   });
 }
 
@@ -143,6 +199,86 @@ class _FakeRotationEngine extends PuzzleEngine {
       totalScore: 30,
       totalChains: 1,
       consumesRotation: move.type == MoveType.rotate3x3,
+    );
+  }
+
+  @override
+  List<MoveCommand> findAvailableMoves(
+    BoardMatrix board, {
+    required int remainingRotations,
+  }) {
+    return [MoveCommand.swapRows(0, 1)];
+  }
+}
+
+class _FakeClearEngine extends PuzzleEngine {
+  _FakeClearEngine({required this.clearedTiles}) : super(random: Random(2));
+
+  final int clearedTiles;
+  final BoardMatrix _board = _boardFromRows(const [
+    'ABCDEAB',
+    'BCDEABC',
+    'CDEABCD',
+    'DEABCDE',
+    'EABCDEA',
+    'ABCDEAB',
+    'BCDEABC',
+  ]);
+
+  @override
+  BoardMatrix createInitialBoard({
+    int remainingRotations = kInitialRotationCharges,
+  }) {
+    return cloneBoard(_board);
+  }
+
+  @override
+  MoveValidation validateMove(
+    BoardMatrix board,
+    MoveCommand move, {
+    required int remainingRotations,
+  }) {
+    return MoveValidation(
+      isValid: true,
+      previewBoard: cloneBoard(board),
+      matchedPositions: {
+        for (var index = 0; index < clearedTiles; index++)
+          BoardPosition(0, index),
+      },
+      consumesRotation: false,
+    );
+  }
+
+  @override
+  MoveApplication applyMove(
+    BoardMatrix board,
+    MoveCommand move, {
+    required int remainingRotations,
+  }) {
+    final snapshot = cloneBoard(board);
+    return MoveApplication(
+      isValid: true,
+      previewBoard: snapshot,
+      finalBoard: snapshot,
+      waves: [
+        ResolveWave(
+          chainIndex: 1,
+          boardBeforeClear: snapshot,
+          boardAfterRefill: snapshot,
+          clearedPositions: {
+            for (var index = 0; index < clearedTiles; index++)
+              BoardPosition(0, index),
+          },
+          clearedTileIds: {
+            for (var index = 0; index < clearedTiles; index++)
+              snapshot[0][index].id,
+          },
+          scoreDelta: 30,
+        ),
+      ],
+      totalScore: 30,
+      totalChains: 1,
+      consumesRotation: false,
     );
   }
 
