@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/game_providers.dart';
 import '../../application/game_session_state.dart';
+import '../widgets/leaderboard_panel.dart';
 
 class ResultScreen extends ConsumerWidget {
   const ResultScreen({super.key});
@@ -13,13 +14,12 @@ class ResultScreen extends ConsumerWidget {
     final controller = ref.read(gameSessionControllerProvider.notifier);
     final backgroundMusic = ref.read(backgroundMusicControllerProvider);
     final title = switch (state.runEndReason) {
-      RunEndReason.timeUp => 'Time Up',
-      _ => 'No More Moves',
+      RunEndReason.timeUp => 'タイムアップ',
+      _ => '手詰まり',
     };
     final subtitle = switch (state.runEndReason) {
-      RunEndReason.timeUp =>
-        'The clock hit zero. Chain quickly and keep extending your run with match bonuses.',
-      _ => 'Your board is stable and every swap or rotation is exhausted.',
+      RunEndReason.timeUp => '残り時間が 0 になりました。すばやく連鎖して、消去ボーナスで時間を伸ばしましょう。',
+      _ => '盤面が安定し、入れ替えと回転で消せる手がなくなりました。',
     };
 
     return DecoratedBox(
@@ -64,15 +64,11 @@ class ResultScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    _ScoreTile(
-                      label: 'Run Score',
-                      value: '${state.lastRunScore}',
-                    ),
+                    _ScoreTile(label: '今回のスコア', value: '${state.lastRunScore}'),
                     const SizedBox(height: 14),
-                    _ScoreTile(
-                      label: 'Best Score',
-                      value: '${state.bestScore}',
-                    ),
+                    _ScoreTile(label: 'ベストスコア', value: '${state.bestScore}'),
+                    const SizedBox(height: 14),
+                    const LeaderboardPanel(compact: true),
                     const SizedBox(height: 28),
                     FilledButton.icon(
                       onPressed: () async {
@@ -80,13 +76,13 @@ class ResultScreen extends ConsumerWidget {
                         controller.startNewGame();
                       },
                       icon: const Icon(Icons.replay_rounded),
-                      label: const Text('Retry'),
+                      label: const Text('もう一度'),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: controller.returnToTitle,
                       icon: const Icon(Icons.home_rounded),
-                      label: const Text('Back to Title'),
+                      label: const Text('タイトルへ'),
                     ),
                   ],
                 ),

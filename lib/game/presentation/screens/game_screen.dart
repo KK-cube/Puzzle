@@ -107,7 +107,7 @@ class GameScreen extends ConsumerWidget {
 
   static String _formatTime(int milliseconds) {
     final seconds = milliseconds / 1000;
-    return '${seconds.toStringAsFixed(1)}s';
+    return '${seconds.toStringAsFixed(1)}秒';
   }
 }
 
@@ -124,7 +124,7 @@ class _HudSection extends StatelessWidget {
         children: [
           Expanded(
             child: _HudChip(
-              label: 'Score',
+              label: '得点',
               value: '${state.score}',
               compact: true,
             ),
@@ -132,7 +132,7 @@ class _HudSection extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _HudChip(
-              label: 'Best',
+              label: '最高',
               value: '${state.bestScore}',
               compact: true,
             ),
@@ -140,7 +140,7 @@ class _HudSection extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _HudChip(
-              label: 'Time',
+              label: '時間',
               value: GameScreen._formatTime(state.remainingTimeMs),
               compact: true,
             ),
@@ -148,7 +148,7 @@ class _HudSection extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _HudChip(
-              label: 'Rotations',
+              label: '回転',
               value: '${state.remainingRotations}',
               compact: true,
             ),
@@ -162,13 +162,13 @@ class _HudSection extends StatelessWidget {
       runSpacing: 12,
       alignment: WrapAlignment.center,
       children: [
-        _HudChip(label: 'Score', value: '${state.score}'),
-        _HudChip(label: 'Best', value: '${state.bestScore}'),
+        _HudChip(label: '得点', value: '${state.score}'),
+        _HudChip(label: '最高', value: '${state.bestScore}'),
         _HudChip(
-          label: 'Time',
+          label: '時間',
           value: GameScreen._formatTime(state.remainingTimeMs),
         ),
-        _HudChip(label: 'Rotations', value: '${state.remainingRotations}'),
+        _HudChip(label: '残り回転', value: '${state.remainingRotations}'),
       ],
     );
   }
@@ -235,7 +235,7 @@ class _ControlPanel extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: onRotateCounterClockwise,
                     icon: const Icon(Icons.rotate_left_rounded),
-                    label: const Text('Rotate CCW'),
+                    label: const Text('左回転'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -243,7 +243,7 @@ class _ControlPanel extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: onRotateClockwise,
                     icon: const Icon(Icons.rotate_right_rounded),
-                    label: const Text('Rotate CW'),
+                    label: const Text('右回転'),
                   ),
                 ),
               ],
@@ -257,12 +257,12 @@ class _ControlPanel extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onRotateCounterClockwise,
                   icon: const Icon(Icons.rotate_left_rounded),
-                  label: const Text('Rotate CCW'),
+                  label: const Text('左回転'),
                 ),
                 FilledButton.icon(
                   onPressed: onRotateClockwise,
                   icon: const Icon(Icons.rotate_right_rounded),
-                  label: const Text('Rotate CW'),
+                  label: const Text('右回転'),
                 ),
               ],
             ),
@@ -270,9 +270,9 @@ class _ControlPanel extends StatelessWidget {
           Text(
             state.selectedRotationCenter == null
                 ? state.remainingRotations > 0
-                      ? 'Tap a center tile to arm a 3x3 rotation.'
-                      : 'No rotations left in this run.'
-                : 'Rotation ready at row ${state.selectedRotationCenter!.row + 1}, column ${state.selectedRotationCenter!.column + 1}.',
+                      ? '中央の牌をタップして 3x3 回転を選択します。'
+                      : 'このプレイではもう回転できません。'
+                : '${state.selectedRotationCenter!.row + 1}行 ${state.selectedRotationCenter!.column + 1}列 を中心に回転できます。',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: compact ? 13 : 14,
@@ -283,8 +283,8 @@ class _ControlPanel extends StatelessWidget {
           SizedBox(height: compact ? 6 : 8),
           Text(
             compact
-                ? 'Drag any tile sideways to slide its column, or vertically to slide its row.'
-                : 'Drag tiles directly: sideways slides a column, vertical movement slides a row. Invalid moves animate and snap back.',
+                ? '牌を横に動かすと列、縦に動かすと行をスライドできます。'
+                : '牌を直接ドラッグして操作します。横移動で列、縦移動で行が動き、無効な手はアニメーション後にもとへ戻ります。',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: compact ? 12 : 13,

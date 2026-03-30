@@ -247,7 +247,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       );
       if (wave.chainIndex > 1) {
         state = state.copyWith(
-          chainBanner: '${wave.chainIndex} Chain',
+          chainBanner: '${wave.chainIndex}連鎖',
           currentChain: wave.chainIndex,
         );
       }

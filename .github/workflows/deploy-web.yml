@@ -49,7 +49,12 @@ jobs:
           fi
 
       - name: Build web app
-        run: flutter build web --release --base-href "${{ steps.base_href.outputs.value }}"
+        run: >
+          flutter build web
+          --release
+          --base-href "${{ steps.base_href.outputs.value }}"
+          --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

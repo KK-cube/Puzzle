@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,6 +14,27 @@ class PuzzleLinesApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<GameSessionState>(gameSessionControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.phase == GamePhase.result ||
+          next.phase != GamePhase.result) {
+        return;
+      }
+
+      final nickname = ref.read(playerNicknameControllerProvider).valueOrNull;
+      if (nickname == null || nickname.trim().isEmpty) {
+        return;
+      }
+
+      unawaited(
+        ref
+            .read(leaderboardControllerProvider.notifier)
+            .submitScore(playerName: nickname, score: next.lastRunScore),
+      );
+    });
+
     final state = ref.watch(gameSessionControllerProvider);
     final screen = switch (state.phase) {
       GamePhase.title => const TitleScreen(),
@@ -25,7 +48,7 @@ class PuzzleLinesApp extends ConsumerWidget {
     };
 
     return MaterialApp(
-      title: 'Line Pulse',
+      title: 'ラインパルス',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

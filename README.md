@@ -32,8 +32,31 @@ https://<username>.github.io/<repo-name>/
 
 ```bash
 flutter pub get
-flutter run -d chrome
+flutter run -d chrome \
+  --dart-define=SUPABASE_URL=YOUR_SUPABASE_URL \
+  --dart-define=SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
+
+`GitHub Pages` の公開ビルドでも同じ 2 つの値を使います。GitHub リポジトリの `Settings > Secrets and variables > Actions` で、次の Secrets を追加してください。
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+`SUPABASE_ANON_KEY` はブラウザ配信で使ってよい公開キーです。`service_role` は絶対に GitHub Pages に入れないでください。
+
+## Supabase 設定
+
+このリポジトリには leaderboard 用の migration が入っています。
+
+- [20260330193000_create_leaderboard.sql](supabase/migrations/20260330193000_create_leaderboard.sql)
+
+想定フローは次のとおりです。
+
+1. Supabase で新しい project を作る
+2. migration を適用する
+3. `SUPABASE_URL` と `SUPABASE_ANON_KEY` をローカル実行と GitHub Secrets に設定する
+
+設定後は、タイトル画面とリザルト画面に `Top 3 Leaderboard` が表示され、ゲーム終了時に保存済みニックネームで自己ベストが自動送信されます。
 
 ## 仕様メモ
 
