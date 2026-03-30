@@ -170,9 +170,10 @@ class _InteractionPainter extends CustomPainter {
       ..color = const Color(0xFFF8FAFC).withValues(alpha: 0.32)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
+    final handleInset = geometry.handleInset;
 
     for (var row = 0; row < kBoardSize; row++) {
-      final rect = geometry.rowHandleRect(row).deflate(14);
+      final rect = geometry.rowHandleRect(row).deflate(handleInset);
       final paint =
           dragAxis == _DragAxis.row && (row == dragFrom || row == dragTo)
           ? activePaint
@@ -184,7 +185,7 @@ class _InteractionPainter extends CustomPainter {
     }
 
     for (var column = 0; column < kBoardSize; column++) {
-      final rect = geometry.columnHandleRect(column).deflate(14);
+      final rect = geometry.columnHandleRect(column).deflate(handleInset);
       final paint =
           dragAxis == _DragAxis.column &&
               (column == dragFrom || column == dragTo)

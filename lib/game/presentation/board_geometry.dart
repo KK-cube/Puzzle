@@ -11,12 +11,17 @@ class BoardGeometry {
   final double boardSize;
   final Size _size;
 
-  late final double outerPadding = boardSize * 0.04;
-  late final double leftGutter = boardSize * 0.14;
-  late final double topGutter = boardSize * 0.14;
+  late final double outerPadding = clampDouble(boardSize * 0.024, 8, 16);
+  late final double leftGutter = clampDouble(boardSize * 0.098, 26, 42);
+  late final double topGutter = clampDouble(boardSize * 0.098, 26, 42);
   late final double boardSide =
-      boardSize - (outerPadding * 2) - leftGutter - topGutter;
+      boardSize - (outerPadding * 2) - math.max(leftGutter, topGutter);
   late final double cellSize = boardSide / kBoardSize;
+  late final double handleInset = clampDouble(
+    math.min(leftGutter, topGutter) * 0.18,
+    4,
+    9,
+  );
   late final Offset origin = Offset(
     (_size.width - boardSize) / 2,
     (_size.height - boardSize) / 2,

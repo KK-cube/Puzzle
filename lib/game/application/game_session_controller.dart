@@ -8,11 +8,35 @@ import '../domain/puzzle_engine.dart';
 import 'board_animation_bus.dart';
 import 'game_session_state.dart';
 
+class GameSessionDurations {
+  const GameSessionDurations({
+    this.move = const Duration(milliseconds: 220),
+    this.revert = const Duration(milliseconds: 180),
+    this.clear = const Duration(milliseconds: 200),
+    this.settle = const Duration(milliseconds: 260),
+    this.chainBannerHold = const Duration(milliseconds: 420),
+  });
+
+  const GameSessionDurations.instant()
+    : move = Duration.zero,
+      revert = Duration.zero,
+      clear = Duration.zero,
+      settle = Duration.zero,
+      chainBannerHold = Duration.zero;
+
+  final Duration move;
+  final Duration revert;
+  final Duration clear;
+  final Duration settle;
+  final Duration chainBannerHold;
+}
+
 class GameSessionController extends StateNotifier<GameSessionState> {
   GameSessionController({
     required PuzzleEngine engine,
     required HighScoreRepository highScoreRepository,
     required BoardAnimationBus animationBus,
+    this.durations = const GameSessionDurations(),
   }) : _engine = engine,
        _highScoreRepository = highScoreRepository,
        _animationBus = animationBus,
@@ -20,15 +44,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     unawaited(_loadBestScore());
   }
 
-  static const _moveDuration = Duration(milliseconds: 220);
-  static const _revertDuration = Duration(milliseconds: 180);
-  static const _clearDuration = Duration(milliseconds: 200);
-  static const _settleDuration = Duration(milliseconds: 260);
-  static const _chainBannerHold = Duration(milliseconds: 420);
-
   final PuzzleEngine _engine;
   final HighScoreRepository _highScoreRepository;
   final BoardAnimationBus _animationBus;
+  final GameSessionDurations durations;
 
   Future<void> _loadBestScore() async {
     final bestScore = await _highScoreRepository.loadHighScore();
@@ -72,6 +91,11 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       return;
     }
 
+    if (state.remainingRotations <= 0) {
+      clearRotationSelection();
+      return;
+    }
+
     if (!center.isRotationCenter) {
       clearRotationSelection();
       return;
@@ -101,7 +125,8 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   Future<void> rotateSelection(RotationDirection direction) async {
     final center = state.selectedRotationCenter;
-    if (center == null) {
+    if (center == null || state.remainingRotations <= 0) {
+      clearRotationSelection();
       return;
     }
 
@@ -137,10 +162,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       _animationBus.emit(
         BoardAnimationEvent.transition(
           validation.previewBoard,
-          duration: _moveDuration,
+          duration: durations.move,
         ),
       );
-      await Future<void>.delayed(_moveDuration);
+      await Future<void>.delayed(durations.move);
     }
 
     if (!validation.isValid) {
@@ -148,17 +173,25 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         _animationBus.emit(
           BoardAnimationEvent.transition(
             originalBoard,
-            duration: _revertDuration,
+            duration: durations.revert,
           ),
         );
-        await Future<void>.delayed(_revertDuration);
+        await Future<void>.delayed(durations.revert);
       }
 
       if (!mounted) {
         return;
       }
 
-      state = state.copyWith(phase: GamePhase.playing, inputLocked: false);
+      if (move.type == MoveType.rotate3x3 && state.remainingRotations <= 0) {
+        state = state.copyWith(
+          phase: GamePhase.playing,
+          inputLocked: false,
+          selectedRotationCenter: null,
+        );
+      } else {
+        state = state.copyWith(phase: GamePhase.playing, inputLocked: false);
+      }
       return;
     }
 
@@ -184,7 +217,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         BoardAnimationEvent.clear(
           wave.boardBeforeClear,
           clearedTileIds: wave.clearedTileIds,
-          duration: _clearDuration,
+          duration: durations.clear,
         ),
       );
       if (wave.chainIndex > 1) {
@@ -193,7 +226,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
           currentChain: wave.chainIndex,
         );
       }
-      await Future<void>.delayed(_clearDuration);
+      await Future<void>.delayed(durations.clear);
 
       nextScore += wave.scoreDelta;
       if (!mounted) {
@@ -208,11 +241,11 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       _animationBus.emit(
         BoardAnimationEvent.transition(
           wave.boardAfterRefill,
-          duration: _settleDuration,
+          duration: durations.settle,
           spawnFromTop: true,
         ),
       );
-      await Future<void>.delayed(_settleDuration);
+      await Future<void>.delayed(durations.settle);
     }
 
     if (!mounted) {
@@ -220,7 +253,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     }
 
     if (state.chainBanner != null) {
-      await Future<void>.delayed(_chainBannerHold);
+      await Future<void>.delayed(durations.chainBannerHold);
       if (!mounted) {
         return;
       }
