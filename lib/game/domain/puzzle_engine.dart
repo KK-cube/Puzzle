@@ -27,6 +27,7 @@ class PuzzleEngine {
     BoardMatrix board,
     MoveCommand move, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     if (move.type == MoveType.rotate3x3 && remainingRotations <= 0) {
       return MoveValidation(
@@ -47,7 +48,11 @@ class PuzzleEngine {
       );
     }
 
-    final matchedPositions = findMatches(previewBoard);
+    var matchedPositions = findMatches(previewBoard);
+    if (matchedPositions.isEmpty && feverActive) {
+      _forceFeverMatch(previewBoard, move);
+      matchedPositions = findMatches(previewBoard);
+    }
     final isValid = matchedPositions.isNotEmpty;
     return MoveValidation(
       isValid: isValid,
@@ -61,11 +66,13 @@ class PuzzleEngine {
     BoardMatrix board,
     MoveCommand move, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     final validation = validateMove(
       board,
       move,
       remainingRotations: remainingRotations,
+      feverActive: feverActive,
     );
     if (!validation.isValid) {
       return MoveApplication(
@@ -139,8 +146,9 @@ class PuzzleEngine {
   List<MoveCommand> findAvailableMoves(
     BoardMatrix board, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
-    final swapMoves = findAvailableSwapMoves(board);
+    final swapMoves = findAvailableSwapMoves(board, feverActive: feverActive);
     if (swapMoves.isNotEmpty) {
       return swapMoves;
     }
@@ -148,10 +156,14 @@ class PuzzleEngine {
     return findAvailableRotationMoves(
       board,
       remainingRotations: remainingRotations,
+      feverActive: feverActive,
     );
   }
 
-  List<MoveCommand> findAvailableSwapMoves(BoardMatrix board) {
+  List<MoveCommand> findAvailableSwapMoves(
+    BoardMatrix board, {
+    bool feverActive = false,
+  }) {
     final moves = <MoveCommand>[];
 
     for (var first = 0; first < kBoardSize; first++) {
@@ -161,6 +173,7 @@ class PuzzleEngine {
           board,
           rowMove,
           remainingRotations: kInitialRotationCharges,
+          feverActive: feverActive,
         ).isValid) {
           moves.add(rowMove);
         }
@@ -170,6 +183,7 @@ class PuzzleEngine {
           board,
           columnMove,
           remainingRotations: kInitialRotationCharges,
+          feverActive: feverActive,
         ).isValid) {
           moves.add(columnMove);
         }
@@ -183,6 +197,7 @@ class PuzzleEngine {
     BoardMatrix board, {
     required int remainingRotations,
     RotationDirection? direction,
+    bool feverActive = false,
   }) {
     if (remainingRotations <= 0) {
       return const [];
@@ -203,6 +218,7 @@ class PuzzleEngine {
             board,
             move,
             remainingRotations: remainingRotations,
+            feverActive: feverActive,
           ).isValid) {
             moves.add(move);
           }
@@ -258,9 +274,10 @@ class PuzzleEngine {
   int calculateScore({required int clearedTiles, required int chainIndex}) {
     final multiplier = switch (chainIndex) {
       1 => 1.0,
-      2 => 1.5,
-      3 => 2.0,
-      _ => 3.0,
+      2 => 2.5,
+      3 => 4.5,
+      4 => 7.0,
+      _ => 10.0,
     };
 
     return (clearedTiles * 10 * multiplier).round();
@@ -406,6 +423,38 @@ class PuzzleEngine {
           }
         }
         return nextBoard;
+    }
+  }
+
+  void _forceFeverMatch(BoardMatrix board, MoveCommand move) {
+    switch (move.type) {
+      case MoveType.swapRow:
+        final row = move.primaryIndex!;
+        final feverColor = board[row][3].color;
+        for (final column in const [2, 3, 4]) {
+          board[row][column] = board[row][column].copyWith(color: feverColor);
+        }
+        return;
+      case MoveType.swapColumn:
+        final column = move.primaryIndex!;
+        final feverColor = board[3][column].color;
+        for (final row in const [2, 3, 4]) {
+          board[row][column] = board[row][column].copyWith(color: feverColor);
+        }
+        return;
+      case MoveType.rotate3x3:
+        final center = move.center!;
+        final feverColor = board[center.row][center.column].color;
+        for (
+          var column = center.column - 1;
+          column <= center.column + 1;
+          column++
+        ) {
+          board[center.row][column] = board[center.row][column].copyWith(
+            color: feverColor,
+          );
+        }
+        return;
     }
   }
 

@@ -79,6 +79,8 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       currentChain: 0,
       remainingRotations: kInitialRotationCharges,
       remainingTimeMs: kInitialRunTimeMs,
+      feverGauge: 0,
+      feverRemainingMs: 0,
       activeHint: null,
       selectedRotationCenter: null,
       inputLocked: false,
@@ -94,6 +96,8 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     _stopCountdown();
     state = state.copyWith(
       phase: GamePhase.title,
+      feverGauge: 0,
+      feverRemainingMs: 0,
       inputLocked: false,
       chainBanner: null,
       selectedRotationCenter: null,
@@ -161,6 +165,21 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     await _runMove(move);
   }
 
+  void activateFever() {
+    if (state.phase != GamePhase.playing ||
+        state.inputLocked ||
+        !state.canActivateFever) {
+      return;
+    }
+
+    _resetHintTimer(clearHint: true);
+    state = state.copyWith(
+      feverGauge: 0,
+      feverRemainingMs: kFeverDurationMs,
+      activeHint: null,
+    );
+  }
+
   Future<void> _runMove(MoveCommand move) async {
     if (state.phase != GamePhase.playing ||
         state.inputLocked ||
@@ -175,6 +194,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       originalBoard,
       move,
       remainingRotations: state.remainingRotations,
+      feverActive: state.isFeverActive,
     );
     final hasVisualChange = !boardsShareLayout(
       originalBoard,
@@ -228,6 +248,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       originalBoard,
       move,
       remainingRotations: state.remainingRotations,
+      feverActive: state.isFeverActive,
     );
     var nextScore = state.score;
     var remainingRotations = state.remainingRotations;
@@ -256,6 +277,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
       nextScore += wave.scoreDelta;
       final timeBonusMs = _timeBonusForClearedTiles(wave.clearedTileIds.length);
+      final feverGaugeGain = _feverGaugeGainForWave(
+        wave.clearedTileIds.length,
+        wave.chainIndex,
+      );
       if (!mounted) {
         return;
       }
@@ -265,6 +290,9 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         score: nextScore,
         currentChain: wave.chainIndex,
         remainingTimeMs: state.remainingTimeMs + timeBonusMs,
+        feverGauge: state.isFeverActive
+            ? state.feverGauge
+            : (state.feverGauge + feverGaugeGain).clamp(0, kFeverGaugeMax),
         activeHint: null,
       );
       _animationBus.emit(
@@ -284,6 +312,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     final availableMoves = _engine.findAvailableMoves(
       state.board,
       remainingRotations: remainingRotations,
+      feverActive: state.isFeverActive,
     );
     if (availableMoves.isEmpty) {
       await _finishRun(nextScore, reason: RunEndReason.noMoreMoves);
@@ -312,12 +341,44 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   void _tickTimer() {
-    if (!mounted || state.phase != GamePhase.playing || state.inputLocked) {
+    if (!mounted ||
+        (state.phase != GamePhase.playing &&
+            state.phase != GamePhase.resolving)) {
       return;
     }
 
     final elapsedMs = durations.timerTick.inMilliseconds;
     if (elapsedMs <= 0) {
+      return;
+    }
+
+    final wasFeverActive = state.isFeverActive;
+    if (wasFeverActive) {
+      final nextFeverRemaining = (state.feverRemainingMs - elapsedMs).clamp(
+        0,
+        kFeverDurationMs,
+      );
+      if (nextFeverRemaining != state.feverRemainingMs) {
+        state = state.copyWith(feverRemainingMs: nextFeverRemaining);
+      }
+
+      final feverJustEnded = nextFeverRemaining == 0;
+      if (feverJustEnded &&
+          state.phase == GamePhase.playing &&
+          !state.inputLocked &&
+          state.hasBoard) {
+        final availableMoves = _engine.findAvailableMoves(
+          state.board,
+          remainingRotations: state.remainingRotations,
+        );
+        if (availableMoves.isEmpty) {
+          unawaited(_finishRun(state.score, reason: RunEndReason.noMoreMoves));
+          return;
+        }
+      }
+    }
+
+    if (state.phase != GamePhase.playing || state.inputLocked) {
       return;
     }
 
@@ -346,15 +407,16 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     final moves = _engine.findAvailableMoves(
       state.board,
       remainingRotations: state.remainingRotations,
+      feverActive: state.isFeverActive,
     );
     if (moves.isEmpty) {
       return null;
     }
 
     if (moves.first.type == MoveType.rotate3x3) {
-      final rescueHint = _bestRotationMove();
-      if (rescueHint != null) {
-        return BoardHint(move: rescueHint);
+      final rotationHint = _bestRotationMove();
+      if (rotationHint != null) {
+        return BoardHint(move: rotationHint);
       }
     }
 
@@ -371,6 +433,11 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     return 0;
   }
 
+  int _feverGaugeGainForWave(int clearedTiles, int chainIndex) {
+    final chainBonus = chainIndex <= 1 ? 0 : (chainIndex - 1) * 18;
+    return (clearedTiles * 8) + chainBonus;
+  }
+
   Future<void> _finishRun(int score, {required RunEndReason reason}) async {
     _stopCountdown();
     _resetHintTimer(clearHint: true);
@@ -379,6 +446,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       phase: GamePhase.resolving,
       inputLocked: true,
       remainingTimeMs: state.remainingTimeMs.clamp(0, kInitialRunTimeMs * 10),
+      feverRemainingMs: 0,
       activeHint: null,
       selectedRotationCenter: null,
       runEndReason: reason,
@@ -420,8 +488,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   MoveCommand? _bestRotationMove({RotationDirection? direction}) {
-    if (!state.hasBoard ||
-        _engine.findAvailableSwapMoves(state.board).isNotEmpty) {
+    if (!state.hasBoard) {
       return null;
     }
 
@@ -429,6 +496,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       state.board,
       remainingRotations: state.remainingRotations,
       direction: direction,
+      feverActive: state.isFeverActive,
     );
     if (candidates.isEmpty) {
       return null;
@@ -441,6 +509,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         state.board,
         move,
         remainingRotations: state.remainingRotations,
+        feverActive: state.isFeverActive,
       );
       if (!validation.isValid) {
         continue;

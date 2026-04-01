@@ -12,36 +12,39 @@ import 'package:flutter_application_1/game/domain/models.dart';
 import 'package:flutter_application_1/game/domain/puzzle_engine.dart';
 
 void main() {
-  test('rescue rotations consume charges until they run out', () async {
-    final engine = _FakeRotationEngine();
-    final controller = GameSessionController(
-      engine: engine,
-      highScoreRepository: InMemoryHighScoreRepository(),
-      animationBus: BoardAnimationBus(),
-      durations: const GameSessionDurations.instant(),
-    );
-    addTearDown(controller.dispose);
+  test(
+    'rotations consume charges until they run out even during normal play',
+    () async {
+      final engine = _FakeRotationEngine();
+      final controller = GameSessionController(
+        engine: engine,
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations.instant(),
+      );
+      addTearDown(controller.dispose);
 
-    controller.startNewGame();
+      controller.startNewGame();
 
-    for (
-      var expectedRemaining = kInitialRotationCharges - 1;
-      expectedRemaining >= 0;
-      expectedRemaining--
-    ) {
+      for (
+        var expectedRemaining = kInitialRotationCharges - 1;
+        expectedRemaining >= 0;
+        expectedRemaining--
+      ) {
+        await controller.rotateSelection(RotationDirection.clockwise);
+        expect(controller.state.remainingRotations, expectedRemaining);
+      }
+
+      expect(controller.state.selectedRotationCenter, isNull);
+
       await controller.rotateSelection(RotationDirection.clockwise);
-      expect(controller.state.remainingRotations, expectedRemaining);
-    }
-
-    expect(controller.state.selectedRotationCenter, isNull);
-
-    await controller.rotateSelection(RotationDirection.clockwise);
-    expect(controller.state.remainingRotations, 0);
-    expect(engine.applyMoveCalls, kInitialRotationCharges);
-  });
+      expect(controller.state.remainingRotations, 0);
+      expect(engine.applyMoveCalls, kInitialRotationCharges);
+    },
+  );
 
   test(
-    'rotation does not consume a charge when no rescue move exists',
+    'rotation does not consume a charge when no valid rotation move exists',
     () async {
       final engine = _FakeRotationEngine(validRotations: 0);
       final controller = GameSessionController(
@@ -60,6 +63,40 @@ void main() {
       expect(engine.applyMoveCalls, 0);
     },
   );
+
+  test('clears build the fever gauge and fever lasts for 5 seconds', () {
+    fakeAsync((async) {
+      final controller = GameSessionController(
+        engine: _FakeClearEngine(clearedTiles: 3),
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations.instant(),
+      );
+      addTearDown(controller.dispose);
+
+      controller.startNewGame();
+      async.flushMicrotasks();
+
+      for (var index = 0; index < 5; index++) {
+        unawaited(controller.swapRows(0, 1));
+        async.elapse(Duration.zero);
+        async.flushMicrotasks();
+      }
+
+      expect(controller.state.feverGauge, kFeverGaugeMax);
+      expect(controller.state.canActivateFever, isTrue);
+
+      controller.activateFever();
+      expect(controller.state.isFeverActive, isTrue);
+      expect(controller.state.feverGauge, 0);
+      expect(controller.state.feverRemainingMs, kFeverDurationMs);
+
+      async.elapse(const Duration(seconds: 5));
+      async.flushMicrotasks();
+      expect(controller.state.isFeverActive, isFalse);
+      expect(controller.state.feverRemainingMs, 0);
+    });
+  });
 
   test('run starts at 30 seconds and ends when the timer reaches zero', () {
     fakeAsync((async) {
@@ -226,6 +263,7 @@ class _FakeRotationEngine extends PuzzleEngine {
     BoardMatrix board,
     MoveCommand move, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     if (move.type == MoveType.rotate3x3) {
       final canRotate =
@@ -257,6 +295,7 @@ class _FakeRotationEngine extends PuzzleEngine {
     BoardMatrix board,
     MoveCommand move, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     applyMoveCalls++;
     final snapshot = cloneBoard(board);
@@ -285,8 +324,11 @@ class _FakeRotationEngine extends PuzzleEngine {
   }
 
   @override
-  List<MoveCommand> findAvailableSwapMoves(BoardMatrix board) {
-    return const [];
+  List<MoveCommand> findAvailableSwapMoves(
+    BoardMatrix board, {
+    bool feverActive = false,
+  }) {
+    return [MoveCommand.swapRows(0, 1)];
   }
 }
 
@@ -316,6 +358,7 @@ class _FakeClearEngine extends PuzzleEngine {
     BoardMatrix board,
     MoveCommand move, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     return MoveValidation(
       isValid: true,
@@ -333,6 +376,7 @@ class _FakeClearEngine extends PuzzleEngine {
     BoardMatrix board,
     MoveCommand move, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     final snapshot = cloneBoard(board);
     return MoveApplication(
@@ -365,6 +409,7 @@ class _FakeClearEngine extends PuzzleEngine {
   List<MoveCommand> findAvailableMoves(
     BoardMatrix board, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     return [MoveCommand.swapRows(0, 1)];
   }
@@ -377,6 +422,7 @@ class _NoMoreMovesAfterClearEngine extends _FakeClearEngine {
   List<MoveCommand> findAvailableMoves(
     BoardMatrix board, {
     required int remainingRotations,
+    bool feverActive = false,
   }) {
     return const [];
   }

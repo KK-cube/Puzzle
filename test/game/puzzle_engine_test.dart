@@ -141,6 +141,29 @@ void main() {
       expect(boardsShareLayout(result.finalBoard, board), isTrue);
     });
 
+    test('fever move guarantees a match for an otherwise invalid swap', () {
+      final engine = PuzzleEngine(random: Random(21));
+      final board = _boardFromRows(const [
+        'ABCDEAB',
+        'BCDEABC',
+        'CDEABCD',
+        'DEABCDE',
+        'EABCDEA',
+        'ABCDEAB',
+        'BCDEABC',
+      ]);
+
+      final validation = engine.validateMove(
+        board,
+        MoveCommand.swapRows(0, 1),
+        remainingRotations: kInitialRotationCharges,
+        feverActive: true,
+      );
+
+      expect(validation.isValid, isTrue);
+      expect(validation.matchedPositions, isNotEmpty);
+    });
+
     test('resolveBoard handles chains and applies score multipliers', () {
       final engine = _ScriptedPuzzleEngine(const [
         TileColor.violet,
@@ -165,13 +188,13 @@ void main() {
       expect(resolution.totalChains, 2);
       expect(resolution.waves, hasLength(2));
       expect(resolution.waves.first.scoreDelta, 30);
-      expect(resolution.waves.last.scoreDelta, 45);
-      expect(resolution.totalScore, 75);
+      expect(resolution.waves.last.scoreDelta, 75);
+      expect(resolution.totalScore, 105);
       expect(engine.findMatches(resolution.finalBoard), isEmpty);
     });
 
     test(
-      'findAvailableRotationMoves surfaces rescue rotations when present',
+      'findAvailableRotationMoves surfaces valid rotations when present',
       () {
         final engine = PuzzleEngine(random: Random(8));
         final board = _boardFromRows(const [

@@ -113,11 +113,58 @@ void main() {
     expect(find.text('左回転'), findsOneWidget);
     expect(find.text('右回転'), findsOneWidget);
     expect(find.text('回転'), findsOneWidget);
-    expect(find.text('まだ行・列の手があります。回転は行き詰まった時だけ使えます。'), findsOneWidget);
+    expect(find.text('FEVER'), findsOneWidget);
+    expect(
+      find.text('回転は通常時でも使えます。押せる向きでは、必ず 3 マス以上そろう 3x3 回転だけが発動します。'),
+      findsOneWidget,
+    );
 
     final boardStageSize = tester.getSize(find.byType(PuzzleBoardStage));
     expect(boardStageSize.width, greaterThan(370));
     expect(boardStageSize.height, boardStageSize.width);
+  });
+
+  testWidgets('how-to-play can be reopened from the game screen help button', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 2200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          highScoreRepositoryProvider.overrideWithValue(
+            InMemoryHighScoreRepository(),
+          ),
+          backgroundMusicControllerProvider.overrideWithValue(
+            SilentBackgroundMusicController(),
+          ),
+          leaderboardRepositoryProvider.overrideWithValue(
+            InMemoryLeaderboardRepository(),
+          ),
+          howToPlayRepositoryProvider.overrideWithValue(
+            InMemoryHowToPlayRepository(true),
+          ),
+          playerNicknameRepositoryProvider.overrideWithValue(
+            InMemoryPlayerNicknameRepository('Tester'),
+          ),
+        ],
+        child: const PuzzleLinesApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('ゲーム開始'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byIcon(Icons.help_outline_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('遊び方'), findsOneWidget);
+    expect(find.text('閉じる'), findsOneWidget);
   });
 
   testWidgets('first start shows the how-to-play screen before the run', (

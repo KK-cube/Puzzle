@@ -189,7 +189,7 @@ class TitleScreen extends ConsumerWidget {
                             ),
                             const _InfoCard(label: '時間', value: '30秒'),
                             const _InfoCard(label: '盤面', value: '7 x 7'),
-                            const _InfoCard(label: '回転', value: '5回の切り札'),
+                            const _InfoCard(label: '回転', value: '5回まで'),
                           ],
                         ),
                         const SizedBox(height: 22),
@@ -201,7 +201,7 @@ class TitleScreen extends ConsumerWidget {
                         const LeaderboardPanel(),
                         const SizedBox(height: 18),
                         const Text(
-                          '3つ消すと +0.5秒、1回の消去で 4つ以上消すと +1秒。回転は詰まった時だけ使える救済手で、発動時は必ず 3 マス以上そろいます。',
+                          '3つ消すと +0.5秒、1回の消去で 4つ以上消すと +1秒。連鎖ほど得点倍率が大きく伸び、右下の FEVER ゲージが満タンになると 5 秒間のフィーバーを発動できます。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,

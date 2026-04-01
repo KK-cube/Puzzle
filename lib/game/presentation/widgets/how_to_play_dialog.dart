@@ -85,9 +85,9 @@ class HowToPlayDialog extends StatelessWidget {
                             ),
                             _HowToCard(
                               icon: Icons.rotate_right_rounded,
-                              title: '3. 回転は切り札',
+                              title: '3. 回転とフィーバー',
                               body:
-                                  '左右回転は詰まった時だけ使える救済手です。残り 5 回までで、使えた時は必ず 3 マス以上そろいます。',
+                                  '左右回転は通常時でも使えます。残り 5 回までで、押すと必ず 3 マス以上そろう 3x3 回転だけが発動します。右下のゲージが満タンになると FEVER を押せます。',
                               accent: Color(0xFF2563EB),
                             ),
                           ],
@@ -114,7 +114,7 @@ class HowToPlayDialog extends StatelessWidget {
                               ),
                               SizedBox(height: 10),
                               Text(
-                                '3つ消しで +0.5秒、4つ以上をまとめて消すと +1.0秒。連鎖や大きな消しを狙うほどスコアと残り時間が伸びます。',
+                                '3つ消しで +0.5秒、4つ以上をまとめて消すと +1.0秒。連鎖ほどスコア倍率が大きく伸び、消去で FEVER ゲージもたまります。',
                                 style: TextStyle(
                                   fontSize: 15,
                                   height: 1.5,

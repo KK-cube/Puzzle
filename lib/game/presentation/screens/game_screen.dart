@@ -8,6 +8,7 @@ import '../../application/game_providers.dart';
 import '../../application/game_session_state.dart';
 import '../../domain/models.dart';
 import '../puzzle_board_stage.dart';
+import '../widgets/how_to_play_dialog.dart';
 import '../widgets/music_settings_button.dart';
 
 class GameScreen extends ConsumerWidget {
@@ -21,22 +22,22 @@ class GameScreen extends ConsumerWidget {
     final backgroundMusic = ref.read(backgroundMusicControllerProvider);
     final showGameOverOverlay =
         state.phase == GamePhase.resolving && state.runEndReason != null;
-    final availableMoves = state.hasBoard
-        ? engine.findAvailableMoves(
+    final rotationMoves = state.hasBoard
+        ? engine.findAvailableRotationMoves(
             state.board,
             remainingRotations: state.remainingRotations,
           )
         : const <MoveCommand>[];
-    final rescueRotations = availableMoves
-        .where((move) => move.type == MoveType.rotate3x3)
-        .toList(growable: false);
     final rotateCounterClockwise =
-        _canRotate(state, rescueRotations, RotationDirection.counterClockwise)
+        _canRotate(state, rotationMoves, RotationDirection.counterClockwise)
         ? () => controller.rotateSelection(RotationDirection.counterClockwise)
         : null;
     final rotateClockwise =
-        _canRotate(state, rescueRotations, RotationDirection.clockwise)
+        _canRotate(state, rotationMoves, RotationDirection.clockwise)
         ? () => controller.rotateSelection(RotationDirection.clockwise)
+        : null;
+    final activateFever = !state.inputLocked && state.canActivateFever
+        ? controller.activateFever
         : null;
 
     return Listener(
@@ -66,9 +67,9 @@ class GameScreen extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
                       child: Column(
                         children: [
-                          const Align(
+                          Align(
                             alignment: Alignment.centerRight,
-                            child: MusicSettingsButton(compact: true),
+                            child: _TopRightActions(compact: true),
                           ),
                           const SizedBox(height: 8),
                           _HudSection(state: state, compact: true),
@@ -96,9 +97,9 @@ class GameScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(18),
                     child: Column(
                       children: [
-                        const Align(
+                        Align(
                           alignment: Alignment.centerRight,
-                          child: MusicSettingsButton(),
+                          child: _TopRightActions(),
                         ),
                         const SizedBox(height: 12),
                         _HudSection(state: state, compact: false),
@@ -128,6 +129,11 @@ class GameScreen extends ConsumerWidget {
               ),
             ),
           ),
+          Positioned(
+            right: 16 + MediaQuery.paddingOf(context).right,
+            bottom: 18 + MediaQuery.paddingOf(context).bottom,
+            child: _FeverDock(state: state, onActivate: activateFever),
+          ),
           if (showGameOverOverlay)
             Positioned.fill(
               child: _GameOverOverlay(reason: state.runEndReason!),
@@ -139,12 +145,12 @@ class GameScreen extends ConsumerWidget {
 
   bool _canRotate(
     GameSessionState state,
-    List<MoveCommand> rescueRotations,
+    List<MoveCommand> rotationMoves,
     RotationDirection direction,
   ) {
     return !state.inputLocked &&
         state.remainingRotations > 0 &&
-        rescueRotations.any((move) => move.direction == direction);
+        rotationMoves.any((move) => move.direction == direction);
   }
 
   static String _formatTime(int milliseconds) {
@@ -206,6 +212,41 @@ class _HudSection extends StatelessWidget {
         ),
         _HudChip(label: '残り回転', value: '${state.remainingRotations}'),
       ],
+    );
+  }
+}
+
+class _TopRightActions extends StatelessWidget {
+  const _TopRightActions({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filledTonal(
+          onPressed: () => _showHowToPlayDialog(context),
+          tooltip: '操作方法',
+          icon: Icon(Icons.help_outline_rounded, size: compact ? 20 : 22),
+          style: IconButton.styleFrom(
+            visualDensity: compact
+                ? VisualDensity.compact
+                : VisualDensity.standard,
+          ),
+        ),
+        const SizedBox(width: 8),
+        MusicSettingsButton(compact: compact),
+      ],
+    );
+  }
+
+  Future<void> _showHowToPlayDialog(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      useSafeArea: false,
+      builder: (_) => const HowToPlayDialog(showStartButton: false),
     );
   }
 }
@@ -304,15 +345,125 @@ class _ControlPanel extends StatelessWidget {
   }
 
   String _rotationMessage() {
-    final rescueReady =
-        onRotateCounterClockwise != null || onRotateClockwise != null;
     if (state.remainingRotations <= 0) {
       return 'このプレイではもう回転できません。';
     }
-    if (rescueReady) {
-      return '回転は詰まった時の切り札です。押すと必ず 3 マス以上そろう 3x3 回転だけが発動します。';
-    }
-    return 'まだ行・列の手があります。回転は行き詰まった時だけ使えます。';
+    return '回転は通常時でも使えます。押せる向きでは、必ず 3 マス以上そろう 3x3 回転だけが発動します。';
+  }
+}
+
+class _FeverDock extends StatelessWidget {
+  const _FeverDock({required this.state, required this.onActivate});
+
+  final GameSessionState state;
+  final VoidCallback? onActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final meterProgress = state.isFeverActive
+        ? state.feverTimeProgress
+        : state.feverGaugeProgress;
+    final statusLabel = state.isFeverActive
+        ? '${(state.feverRemainingMs / 1000).toStringAsFixed(1)}s'
+        : '${state.feverGauge} / $kFeverGaugeMax';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: 132,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: state.isFeverActive
+              ? const [Color(0xFFFFB347), Color(0xFFFF6B6B), Color(0xFFFFD166)]
+              : const [Color(0xFF17324D), Color(0xFF0F766E)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color:
+                (state.isFeverActive
+                        ? const Color(0xFFF97316)
+                        : const Color(0xFF17324D))
+                    .withValues(alpha: 0.24),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            state.isFeverActive ? 'FEVER!' : 'FEVER',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.4,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 10,
+              child: Stack(
+                children: [
+                  Container(color: Colors.white.withValues(alpha: 0.18)),
+                  FractionallySizedBox(
+                    widthFactor: meterProgress,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFFF08A), Color(0xFFFF9A62)],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            statusLabel,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.white.withValues(alpha: 0.92),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: state.isFeverActive ? null : onActivate,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF172033),
+                disabledBackgroundColor: Colors.white.withValues(alpha: 0.22),
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.88),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              child: Text(
+                state.isFeverActive
+                    ? '発動中'
+                    : state.canActivateFever
+                    ? '発動'
+                    : 'ためる',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

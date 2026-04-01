@@ -6,6 +6,8 @@ enum RunEndReason { noMoreMoves, timeUp }
 
 const kInitialRunTimeMs = 30000;
 const kHintDelayMs = 5000;
+const kFeverGaugeMax = 100;
+const kFeverDurationMs = 5000;
 
 const _unset = Object();
 
@@ -19,6 +21,8 @@ class GameSessionState {
     required this.currentChain,
     required this.remainingRotations,
     required this.remainingTimeMs,
+    required this.feverGauge,
+    required this.feverRemainingMs,
     required this.activeHint,
     required this.selectedRotationCenter,
     required this.inputLocked,
@@ -35,6 +39,8 @@ class GameSessionState {
       currentChain = 0,
       remainingRotations = kInitialRotationCharges,
       remainingTimeMs = kInitialRunTimeMs,
+      feverGauge = 0,
+      feverRemainingMs = 0,
       activeHint = null,
       selectedRotationCenter = null,
       inputLocked = false,
@@ -49,6 +55,8 @@ class GameSessionState {
   final int currentChain;
   final int remainingRotations;
   final int remainingTimeMs;
+  final int feverGauge;
+  final int feverRemainingMs;
   final BoardHint? activeHint;
   final BoardPosition? selectedRotationCenter;
   final bool inputLocked;
@@ -56,6 +64,12 @@ class GameSessionState {
   final RunEndReason? runEndReason;
 
   bool get hasBoard => board.isNotEmpty;
+  bool get isFeverActive => feverRemainingMs > 0;
+  bool get canActivateFever => !isFeverActive && feverGauge >= kFeverGaugeMax;
+  double get feverGaugeProgress =>
+      (feverGauge / kFeverGaugeMax).clamp(0.0, 1.0).toDouble();
+  double get feverTimeProgress =>
+      (feverRemainingMs / kFeverDurationMs).clamp(0.0, 1.0).toDouble();
 
   GameSessionState copyWith({
     GamePhase? phase,
@@ -66,6 +80,8 @@ class GameSessionState {
     int? currentChain,
     int? remainingRotations,
     int? remainingTimeMs,
+    int? feverGauge,
+    int? feverRemainingMs,
     Object? activeHint = _unset,
     Object? selectedRotationCenter = _unset,
     bool? inputLocked,
@@ -81,6 +97,8 @@ class GameSessionState {
       currentChain: currentChain ?? this.currentChain,
       remainingRotations: remainingRotations ?? this.remainingRotations,
       remainingTimeMs: remainingTimeMs ?? this.remainingTimeMs,
+      feverGauge: feverGauge ?? this.feverGauge,
+      feverRemainingMs: feverRemainingMs ?? this.feverRemainingMs,
       activeHint: identical(activeHint, _unset)
           ? this.activeHint
           : activeHint as BoardHint?,
