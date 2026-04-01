@@ -486,10 +486,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   int _timeBonusForClearedTiles(int clearedTiles) {
     if (clearedTiles >= 4) {
-      return 700;
+      return 900;
     }
     if (clearedTiles >= 3) {
-      return 350;
+      return 450;
     }
     return 0;
   }

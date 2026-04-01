@@ -179,7 +179,7 @@ void main() {
       async.flushMicrotasks();
 
       expect(controller.state.phase, GamePhase.playing);
-      expect(controller.state.remainingTimeMs, 400);
+      expect(controller.state.remainingTimeMs, 600);
     });
   });
 
@@ -194,7 +194,7 @@ void main() {
     threeTileController.startNewGame();
 
     await threeTileController.swapRows(0, 1);
-    expect(threeTileController.state.remainingTimeMs, 30350);
+    expect(threeTileController.state.remainingTimeMs, 30450);
 
     final fourTileController = GameSessionController(
       engine: _FakeClearEngine(clearedTiles: 4),
@@ -206,7 +206,7 @@ void main() {
     fourTileController.startNewGame();
 
     await fourTileController.swapRows(0, 1);
-    expect(fourTileController.state.remainingTimeMs, 30700);
+    expect(fourTileController.state.remainingTimeMs, 30900);
   });
 
   test('shows a hint after 5 seconds without clearing', () {
