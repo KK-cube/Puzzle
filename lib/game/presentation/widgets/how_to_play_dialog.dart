@@ -114,7 +114,7 @@ class HowToPlayDialog extends StatelessWidget {
                               ),
                               SizedBox(height: 10),
                               Text(
-                                '3つ消しで +0.5秒、4つ以上をまとめて消すと +1.0秒。連鎖ほどスコア倍率が大きく伸び、必要ポイントを満たして FEVER を押すと 7.5 秒間どこを動かしてもそろいます。',
+                                '3つ消しで +0.2秒、4つ以上をまとめて消すと +0.4秒。連鎖ほどスコア倍率が大きく伸び、必要ポイントを満たして FEVER を押すと 7.5 秒間どこを動かしてもそろいます。',
                                 style: TextStyle(
                                   fontSize: 15,
                                   height: 1.5,

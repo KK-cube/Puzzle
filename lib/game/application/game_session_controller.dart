@@ -56,6 +56,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   final GameSessionDurations durations;
   Timer? _countdownTimer;
   int _inactiveHintMs = 0;
+  bool _timeUpPending = false;
 
   Future<void> _loadBestScore() async {
     final bestScore = await _highScoreRepository.loadHighScore();
@@ -68,6 +69,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   void startNewGame() {
     _stopCountdown();
+    _timeUpPending = false;
     final board = _engine.createInitialBoard(remainingRotations: 0);
     state = state.copyWith(
       phase: GamePhase.playing,
@@ -94,6 +96,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   void returnToTitle() {
     _stopCountdown();
+    _timeUpPending = false;
     state = state.copyWith(
       phase: GamePhase.title,
       feverGauge: 0,
@@ -258,6 +261,11 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         return;
       }
 
+      if (_timeUpPending || state.remainingTimeMs <= 0) {
+        await _finishRun(state.score, reason: RunEndReason.timeUp);
+        return;
+      }
+
       if (move.type == MoveType.rotate3x3 && state.remainingRotations <= 0) {
         state = state.copyWith(
           phase: GamePhase.playing,
@@ -326,6 +334,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
               ),
         activeHint: null,
       );
+      if (_timeUpPending && state.remainingTimeMs > 0) {
+        _timeUpPending = false;
+        _resumeCountdown();
+      }
       _animationBus.emit(
         BoardAnimationEvent.transition(
           wave.boardAfterRefill,
@@ -337,6 +349,11 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     }
 
     if (!mounted) {
+      return;
+    }
+
+    if (_timeUpPending || state.remainingTimeMs <= 0) {
+      await _finishRun(nextScore, reason: RunEndReason.timeUp);
       return;
     }
 
@@ -365,7 +382,11 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     _countdownTimer = Timer.periodic(durations.timerTick, (_) => _tickTimer());
   }
 
-  void _resumeCountdown() {}
+  void _resumeCountdown() {
+    if (_countdownTimer == null && !_timeUpPending) {
+      _startCountdown();
+    }
+  }
 
   void _stopCountdown() {
     _countdownTimer?.cancel();
@@ -411,10 +432,6 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       }
     }
 
-    if (state.phase != GamePhase.playing || state.isInteractionLocked) {
-      return;
-    }
-
     final nextRemainingTime = (state.remainingTimeMs - elapsedMs).clamp(
       0,
       1 << 31,
@@ -424,15 +441,26 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     }
 
     state = state.copyWith(remainingTimeMs: nextRemainingTime);
+    if (nextRemainingTime <= 0) {
+      if (state.phase == GamePhase.playing && !state.inputLocked) {
+        unawaited(_finishRun(state.score, reason: RunEndReason.timeUp));
+      } else {
+        _timeUpPending = true;
+        _stopCountdown();
+      }
+      return;
+    }
+
+    if (state.phase != GamePhase.playing || state.isInteractionLocked) {
+      return;
+    }
+
     _inactiveHintMs += elapsedMs;
     if (_inactiveHintMs >= kHintDelayMs && state.activeHint == null) {
       final hint = _buildHint();
       if (hint != null) {
         state = state.copyWith(activeHint: hint);
       }
-    }
-    if (nextRemainingTime <= 0) {
-      unawaited(_finishRun(state.score, reason: RunEndReason.timeUp));
     }
   }
 
@@ -458,10 +486,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   int _timeBonusForClearedTiles(int clearedTiles) {
     if (clearedTiles >= 4) {
-      return 1000;
+      return 400;
     }
     if (clearedTiles >= 3) {
-      return 500;
+      return 200;
     }
     return 0;
   }
@@ -472,6 +500,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   Future<void> _finishRun(int score, {required RunEndReason reason}) async {
     _stopCountdown();
+    _timeUpPending = false;
     _resetHintTimer(clearHint: true);
     final finalBoard = cloneBoard(state.board);
     state = state.copyWith(
