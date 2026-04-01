@@ -87,7 +87,7 @@ class HowToPlayDialog extends StatelessWidget {
                               icon: Icons.local_fire_department_rounded,
                               title: '3. フィーバー',
                               body:
-                                  'FEVER は初回 500pt、以降は 500pt ずつ必要値が増えます。右下のボタンから発動すると、7.5 秒間はどこを動かしてもそろいます。',
+                                  'FEVER は 500pt → 2500pt → 5000pt → 8000pt → 12000pt の順に解放されます。右下のボタンから発動すると、7.5 秒間はどこを動かしてもそろいます。',
                               accent: Color(0xFF2563EB),
                             ),
                           ],

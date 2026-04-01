@@ -183,7 +183,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     _resetHintTimer(clearHint: true);
     state = state.copyWith(
       feverGauge: 0,
-      feverChargeGoal: state.feverChargeGoal + kFeverChargeGoalStep,
+      feverChargeGoal: nextFeverChargeGoal(state.feverChargeGoal),
       feverRemainingMs: kFeverDurationMs,
       activeHint: null,
     );

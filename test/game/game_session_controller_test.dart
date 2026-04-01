@@ -35,7 +35,7 @@ void main() {
   });
 
   test(
-    'fever unlock cost steps up by 500 points and lasts for 7.5 seconds',
+    'fever unlock cost follows milestone goals and lasts for 7.5 seconds',
     () {
       fakeAsync((async) {
         final controller = GameSessionController(
@@ -63,10 +63,7 @@ void main() {
         controller.activateFever();
         expect(controller.state.isFeverActive, isTrue);
         expect(controller.state.feverGauge, 0);
-        expect(
-          controller.state.feverChargeGoal,
-          kInitialFeverChargeGoal + kFeverChargeGoalStep,
-        );
+        expect(controller.state.feverChargeGoal, kFeverChargeGoals[1]);
         expect(controller.state.feverRemainingMs, kFeverDurationMs);
 
         async.elapse(const Duration(milliseconds: 7400));
@@ -78,14 +75,14 @@ void main() {
         expect(controller.state.isFeverActive, isFalse);
         expect(controller.state.feverRemainingMs, 0);
 
-        for (var index = 0; index < 4; index++) {
+        for (var index = 0; index < 10; index++) {
           unawaited(controller.swapRows(0, 1));
           async.elapse(Duration.zero);
           async.flushMicrotasks();
         }
 
-        expect(controller.state.feverGauge, 1000);
-        expect(controller.state.feverChargeGoal, 1000);
+        expect(controller.state.feverGauge, 2500);
+        expect(controller.state.feverChargeGoal, 2500);
         expect(controller.state.canActivateFever, isTrue);
       });
     },

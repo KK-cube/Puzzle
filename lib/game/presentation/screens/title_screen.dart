@@ -175,7 +175,10 @@ class TitleScreen extends ConsumerWidget {
                             ),
                             const _InfoCard(label: '時間', value: '30秒'),
                             const _InfoCard(label: '盤面', value: '7 x 7'),
-                            const _InfoCard(label: 'FEVER', value: '500pt〜'),
+                            const _InfoCard(
+                              label: 'FEVER',
+                              value: '500→12000pt',
+                            ),
                           ],
                         ),
                         const SizedBox(height: 22),
@@ -187,7 +190,7 @@ class TitleScreen extends ConsumerWidget {
                         const LeaderboardPanel(),
                         const SizedBox(height: 18),
                         const Text(
-                          '3つ消すと +1.05秒、1回の消去で 4つ以上消すと +2.1秒。連鎖ほど得点倍率が大きく伸び、FEVER は初回 500pt、以降は 500pt ずつ必要値が増えます。発動すると 7.5 秒間フィーバーです。',
+                          '3つ消すと +1.05秒、1回の消去で 4つ以上消すと +2.1秒。連鎖ほど得点倍率が大きく伸び、FEVER は 500pt → 2500pt → 5000pt → 8000pt → 12000pt の順に解放されます。発動すると 7.5 秒間フィーバーです。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,

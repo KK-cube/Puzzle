@@ -6,9 +6,17 @@ enum RunEndReason { noMoreMoves, timeUp }
 
 const kInitialRunTimeMs = 30000;
 const kHintDelayMs = 5000;
+const kFeverChargeGoals = <int>[500, 2500, 5000, 8000, 12000];
 const kInitialFeverChargeGoal = 500;
-const kFeverChargeGoalStep = 500;
 const kFeverDurationMs = 7500;
+
+int nextFeverChargeGoal(int currentGoal) {
+  final currentIndex = kFeverChargeGoals.indexOf(currentGoal);
+  if (currentIndex == -1 || currentIndex >= kFeverChargeGoals.length - 1) {
+    return kFeverChargeGoals.last;
+  }
+  return kFeverChargeGoals[currentIndex + 1];
+}
 
 const _unset = Object();
 
