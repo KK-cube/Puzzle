@@ -9,20 +9,14 @@ import 'package:flutter_application_1/game/domain/puzzle_engine.dart';
 void main() {
   group('PuzzleEngine', () {
     test(
-      'createInitialBoard avoids immediate matches and has available moves',
+      'createInitialBoard avoids immediate matches and has standard moves',
       () {
         final engine = PuzzleEngine(random: Random(7));
 
         final board = engine.createInitialBoard();
 
         expect(engine.findMatches(board), isEmpty);
-        expect(
-          engine.findAvailableMoves(
-            board,
-            remainingRotations: kInitialRotationCharges,
-          ),
-          isNotEmpty,
-        );
+        expect(engine.findAvailableSwapMoves(board), isNotEmpty);
       },
     );
 
@@ -119,7 +113,7 @@ void main() {
       expect(boardsShareLayout(result.finalBoard, board), isTrue);
     });
 
-    test('rotation applies even when no match is created', () {
+    test('rotation without a match is rejected', () {
       final engine = PuzzleEngine(random: Random(21));
       final board = _boardFromRows(const [
         'ABCDEAB',
@@ -140,11 +134,11 @@ void main() {
         remainingRotations: kInitialRotationCharges,
       );
 
-      expect(result.isValid, isTrue);
-      expect(result.consumesRotation, isTrue);
+      expect(result.isValid, isFalse);
+      expect(result.consumesRotation, isFalse);
       expect(result.waves, isEmpty);
       expect(result.totalScore, 0);
-      expect(boardsShareLayout(result.finalBoard, board), isFalse);
+      expect(boardsShareLayout(result.finalBoard, board), isTrue);
     });
 
     test('resolveBoard handles chains and applies score multipliers', () {
@@ -176,25 +170,28 @@ void main() {
       expect(engine.findMatches(resolution.finalBoard), isEmpty);
     });
 
-    test('findAvailableMoves surfaces different move types when present', () {
-      final engine = PuzzleEngine(random: Random(8));
-      final board = _boardFromRows(const [
-        'ABCAADE',
-        'DEBCADB',
-        'CDEABCE',
-        'EABCDEA',
-        'BCDEABC',
-        'CEABDCE',
-        'DEABCED',
-      ]);
+    test(
+      'findAvailableRotationMoves surfaces rescue rotations when present',
+      () {
+        final engine = PuzzleEngine(random: Random(8));
+        final board = _boardFromRows(const [
+          'ABCAADE',
+          'DEBCADB',
+          'CDEABCE',
+          'EABCDEA',
+          'BCDEABC',
+          'CEABDCE',
+          'DEABCED',
+        ]);
 
-      final moves = engine.findAvailableMoves(
-        board,
-        remainingRotations: kInitialRotationCharges,
-      );
+        final moves = engine.findAvailableRotationMoves(
+          board,
+          remainingRotations: kInitialRotationCharges,
+        );
 
-      expect(moves.any((move) => move.type == MoveType.rotate3x3), isTrue);
-    });
+        expect(moves.any((move) => move.type == MoveType.rotate3x3), isTrue);
+      },
+    );
   });
 }
 

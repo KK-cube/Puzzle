@@ -1,5 +1,5 @@
 const int kBoardSize = 7;
-const int kInitialRotationCharges = 10;
+const int kInitialRotationCharges = 5;
 
 typedef BoardMatrix = List<List<Tile>>;
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -40,12 +39,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     required PuzzleEngine engine,
     required HighScoreRepository highScoreRepository,
     required BoardAnimationBus animationBus,
-    Random? random,
     this.durations = const GameSessionDurations(),
   }) : _engine = engine,
        _highScoreRepository = highScoreRepository,
        _animationBus = animationBus,
-       _random = random ?? Random(),
        super(const GameSessionState.initial()) {
     unawaited(_loadBestScore());
   }
@@ -53,7 +50,6 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   final PuzzleEngine _engine;
   final HighScoreRepository _highScoreRepository;
   final BoardAnimationBus _animationBus;
-  final Random _random;
   final GameSessionDurations durations;
   Timer? _countdownTimer;
   int _inactiveHintMs = 0;
@@ -150,16 +146,16 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   Future<void> rotateSelection(RotationDirection direction) async {
-    if (state.remainingRotations <= 0) {
+    if (state.remainingRotations <= 0 || !state.hasBoard) {
       return;
     }
 
-    await _runMove(
-      MoveCommand.rotate3x3(
-        center: _randomRotationCenter(),
-        direction: direction,
-      ),
-    );
+    final move = _bestRotationMove(direction: direction);
+    if (move == null) {
+      return;
+    }
+
+    await _runMove(move);
   }
 
   Future<void> _runMove(MoveCommand move) async {
@@ -352,13 +348,14 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       return null;
     }
 
-    return BoardHint(move: moves.first);
-  }
+    if (moves.first.type == MoveType.rotate3x3) {
+      final rescueHint = _bestRotationMove();
+      if (rescueHint != null) {
+        return BoardHint(move: rescueHint);
+      }
+    }
 
-  BoardPosition _randomRotationCenter() {
-    final row = 1 + _random.nextInt(kBoardSize - 2);
-    final column = 1 + _random.nextInt(kBoardSize - 2);
-    return BoardPosition(row, column);
+    return BoardHint(move: moves.first);
   }
 
   int _timeBonusForClearedTiles(int clearedTiles) {
@@ -402,6 +399,42 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     if (clearHint && state.activeHint != null) {
       state = state.copyWith(activeHint: null);
     }
+  }
+
+  MoveCommand? _bestRotationMove({RotationDirection? direction}) {
+    if (!state.hasBoard ||
+        _engine.findAvailableSwapMoves(state.board).isNotEmpty) {
+      return null;
+    }
+
+    final candidates = _engine.findAvailableRotationMoves(
+      state.board,
+      remainingRotations: state.remainingRotations,
+      direction: direction,
+    );
+    if (candidates.isEmpty) {
+      return null;
+    }
+
+    MoveCommand? bestMove;
+    var bestMatchedTiles = -1;
+    for (final move in candidates) {
+      final validation = _engine.validateMove(
+        state.board,
+        move,
+        remainingRotations: state.remainingRotations,
+      );
+      if (!validation.isValid) {
+        continue;
+      }
+      final matchedTiles = validation.matchedPositions.length;
+      if (matchedTiles > bestMatchedTiles) {
+        bestMove = move;
+        bestMatchedTiles = matchedTiles;
+      }
+    }
+
+    return bestMove;
   }
 
   @override

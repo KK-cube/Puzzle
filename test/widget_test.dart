@@ -106,7 +106,7 @@ void main() {
     expect(find.text('左回転'), findsOneWidget);
     expect(find.text('右回転'), findsOneWidget);
     expect(find.text('回転'), findsOneWidget);
-    expect(find.text('牌を横に動かすと列、縦に動かすと行をスライドできます。'), findsOneWidget);
+    expect(find.text('まだ行・列の手があります。回転は行き詰まった時だけ使えます。'), findsOneWidget);
 
     final boardStageSize = tester.getSize(find.byType(PuzzleBoardStage));
     expect(boardStageSize.width, greaterThan(370));
@@ -260,7 +260,6 @@ class _ResultGameSessionController extends GameSessionController {
         engine: PuzzleEngine(random: Random(7)),
         highScoreRepository: InMemoryHighScoreRepository(1200),
         animationBus: BoardAnimationBus(),
-        random: Random(1),
         durations: const GameSessionDurations.instant(),
       ) {
     showResult();

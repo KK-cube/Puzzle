@@ -15,10 +15,7 @@ class PuzzleEngine {
   }) {
     for (var attempt = 0; attempt < 300; attempt++) {
       final board = _generateMatchFreeBoard();
-      if (findAvailableMoves(
-        board,
-        remainingRotations: remainingRotations,
-      ).isNotEmpty) {
+      if (findAvailableSwapMoves(board).isNotEmpty) {
         return board;
       }
     }
@@ -51,12 +48,12 @@ class PuzzleEngine {
     }
 
     final matchedPositions = findMatches(previewBoard);
-    final isRotation = move.type == MoveType.rotate3x3;
+    final isValid = matchedPositions.isNotEmpty;
     return MoveValidation(
-      isValid: isRotation || matchedPositions.isNotEmpty,
+      isValid: isValid,
       previewBoard: previewBoard,
       matchedPositions: matchedPositions,
-      consumesRotation: isRotation,
+      consumesRotation: isValid && move.type == MoveType.rotate3x3,
     );
   }
 
@@ -143,6 +140,18 @@ class PuzzleEngine {
     BoardMatrix board, {
     required int remainingRotations,
   }) {
+    final swapMoves = findAvailableSwapMoves(board);
+    if (swapMoves.isNotEmpty) {
+      return swapMoves;
+    }
+
+    return findAvailableRotationMoves(
+      board,
+      remainingRotations: remainingRotations,
+    );
+  }
+
+  List<MoveCommand> findAvailableSwapMoves(BoardMatrix board) {
     final moves = <MoveCommand>[];
 
     for (var first = 0; first < kBoardSize; first++) {
@@ -151,7 +160,7 @@ class PuzzleEngine {
         if (validateMove(
           board,
           rowMove,
-          remainingRotations: remainingRotations,
+          remainingRotations: kInitialRotationCharges,
         ).isValid) {
           moves.add(rowMove);
         }
@@ -160,28 +169,42 @@ class PuzzleEngine {
         if (validateMove(
           board,
           columnMove,
-          remainingRotations: remainingRotations,
+          remainingRotations: kInitialRotationCharges,
         ).isValid) {
           moves.add(columnMove);
         }
       }
     }
 
-    if (remainingRotations > 0) {
-      for (var row = 1; row < kBoardSize - 1; row++) {
-        for (var column = 1; column < kBoardSize - 1; column++) {
-          for (final direction in RotationDirection.values) {
-            final move = MoveCommand.rotate3x3(
-              center: BoardPosition(row, column),
-              direction: direction,
-            );
-            if (validateMove(
-              board,
-              move,
-              remainingRotations: remainingRotations,
-            ).isValid) {
-              moves.add(move);
-            }
+    return moves;
+  }
+
+  List<MoveCommand> findAvailableRotationMoves(
+    BoardMatrix board, {
+    required int remainingRotations,
+    RotationDirection? direction,
+  }) {
+    if (remainingRotations <= 0) {
+      return const [];
+    }
+
+    final moves = <MoveCommand>[];
+    for (var row = 1; row < kBoardSize - 1; row++) {
+      for (var column = 1; column < kBoardSize - 1; column++) {
+        final directions = direction == null
+            ? RotationDirection.values
+            : [direction];
+        for (final candidateDirection in directions) {
+          final move = MoveCommand.rotate3x3(
+            center: BoardPosition(row, column),
+            direction: candidateDirection,
+          );
+          if (validateMove(
+            board,
+            move,
+            remainingRotations: remainingRotations,
+          ).isValid) {
+            moves.add(move);
           }
         }
       }

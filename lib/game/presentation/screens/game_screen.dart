@@ -15,12 +15,24 @@ class GameScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameSessionControllerProvider);
+    final engine = ref.watch(puzzleEngineProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
     final backgroundMusic = ref.read(backgroundMusicControllerProvider);
-    final rotateCounterClockwise = _canRotate(state)
+    final availableMoves = state.hasBoard
+        ? engine.findAvailableMoves(
+            state.board,
+            remainingRotations: state.remainingRotations,
+          )
+        : const <MoveCommand>[];
+    final rescueRotations = availableMoves
+        .where((move) => move.type == MoveType.rotate3x3)
+        .toList(growable: false);
+    final rotateCounterClockwise =
+        _canRotate(state, rescueRotations, RotationDirection.counterClockwise)
         ? () => controller.rotateSelection(RotationDirection.counterClockwise)
         : null;
-    final rotateClockwise = _canRotate(state)
+    final rotateClockwise =
+        _canRotate(state, rescueRotations, RotationDirection.clockwise)
         ? () => controller.rotateSelection(RotationDirection.clockwise)
         : null;
 
@@ -110,8 +122,14 @@ class GameScreen extends ConsumerWidget {
     );
   }
 
-  bool _canRotate(GameSessionState state) {
-    return !state.inputLocked && state.remainingRotations > 0;
+  bool _canRotate(
+    GameSessionState state,
+    List<MoveCommand> rescueRotations,
+    RotationDirection direction,
+  ) {
+    return !state.inputLocked &&
+        state.remainingRotations > 0 &&
+        rescueRotations.any((move) => move.direction == direction);
   }
 
   static String _formatTime(int milliseconds) {
@@ -252,9 +270,7 @@ class _ControlPanel extends StatelessWidget {
             ),
           SizedBox(height: compact ? 8 : 10),
           Text(
-            state.remainingRotations > 0
-                ? '左右のボタンでランダムな 3x3 エリアを回転します。'
-                : 'このプレイではもう回転できません。',
+            _rotationMessage(),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: compact ? 13 : 14,
@@ -276,6 +292,18 @@ class _ControlPanel extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _rotationMessage() {
+    final rescueReady =
+        onRotateCounterClockwise != null || onRotateClockwise != null;
+    if (state.remainingRotations <= 0) {
+      return 'このプレイではもう回転できません。';
+    }
+    if (rescueReady) {
+      return '回転は詰まった時の切り札です。押すと必ず 3 マス以上そろう 3x3 回転だけが発動します。';
+    }
+    return 'まだ行・列の手があります。回転は行き詰まった時だけ使えます。';
   }
 }
 
