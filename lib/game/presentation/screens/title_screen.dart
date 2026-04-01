@@ -187,7 +187,7 @@ class TitleScreen extends ConsumerWidget {
                         const LeaderboardPanel(),
                         const SizedBox(height: 18),
                         const Text(
-                          '3つ消すと +1.5秒、1回の消去で 4つ以上消すと +3.0秒。連鎖ほど得点倍率が大きく伸び、FEVER は初回 500pt、以降は 500pt ずつ必要値が増えます。発動すると 7.5 秒間フィーバーです。',
+                          '3つ消すと +1.25秒、1回の消去で 4つ以上消すと +2.5秒。連鎖ほど得点倍率が大きく伸び、FEVER は初回 500pt、以降は 500pt ずつ必要値が増えます。発動すると 7.5 秒間フィーバーです。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
