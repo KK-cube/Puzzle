@@ -11,6 +11,7 @@ import 'package:flutter_application_1/game/application/game_providers.dart';
 import 'package:flutter_application_1/game/application/game_session_controller.dart';
 import 'package:flutter_application_1/game/application/game_session_state.dart';
 import 'package:flutter_application_1/game/domain/high_score_repository.dart';
+import 'package:flutter_application_1/game/domain/how_to_play_repository.dart';
 import 'package:flutter_application_1/game/domain/leaderboard_repository.dart';
 import 'package:flutter_application_1/game/domain/music_settings_repository.dart';
 import 'package:flutter_application_1/game/domain/player_nickname_repository.dart';
@@ -40,6 +41,9 @@ void main() {
             InMemoryLeaderboardRepository(
               seedScores: {'Alice': 2401, 'Bob': 1800, 'Cara': 1300},
             ),
+          ),
+          howToPlayRepositoryProvider.overrideWithValue(
+            InMemoryHowToPlayRepository(true),
           ),
           playerNicknameRepositoryProvider.overrideWithValue(
             InMemoryPlayerNicknameRepository('Tester'),
@@ -89,6 +93,9 @@ void main() {
               seedScores: {'Alice': 2401, 'Bob': 1800, 'Cara': 1300},
             ),
           ),
+          howToPlayRepositoryProvider.overrideWithValue(
+            InMemoryHowToPlayRepository(true),
+          ),
           playerNicknameRepositoryProvider.overrideWithValue(
             InMemoryPlayerNicknameRepository('Tester'),
           ),
@@ -111,6 +118,51 @@ void main() {
     final boardStageSize = tester.getSize(find.byType(PuzzleBoardStage));
     expect(boardStageSize.width, greaterThan(370));
     expect(boardStageSize.height, boardStageSize.width);
+  });
+
+  testWidgets('first start shows the how-to-play screen before the run', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 2200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          highScoreRepositoryProvider.overrideWithValue(
+            InMemoryHighScoreRepository(),
+          ),
+          backgroundMusicControllerProvider.overrideWithValue(
+            SilentBackgroundMusicController(),
+          ),
+          leaderboardRepositoryProvider.overrideWithValue(
+            InMemoryLeaderboardRepository(),
+          ),
+          howToPlayRepositoryProvider.overrideWithValue(
+            InMemoryHowToPlayRepository(false),
+          ),
+          playerNicknameRepositoryProvider.overrideWithValue(
+            InMemoryPlayerNicknameRepository('Tester'),
+          ),
+        ],
+        child: const PuzzleLinesApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('ゲーム開始'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('遊び方'), findsOneWidget);
+    expect(find.text('理解してスタート'), findsOneWidget);
+
+    await tester.tap(find.text('理解してスタート'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('得点'), findsOneWidget);
   });
 
   testWidgets('start prompts for nickname when none is saved', (tester) async {
@@ -169,6 +221,9 @@ void main() {
           ),
           leaderboardRepositoryProvider.overrideWithValue(
             InMemoryLeaderboardRepository(),
+          ),
+          howToPlayRepositoryProvider.overrideWithValue(
+            InMemoryHowToPlayRepository(true),
           ),
           playerNicknameRepositoryProvider.overrideWithValue(
             InMemoryPlayerNicknameRepository('Tester'),

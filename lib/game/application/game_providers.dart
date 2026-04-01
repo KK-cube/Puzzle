@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/background_music_controller.dart';
 import '../domain/high_score_repository.dart';
+import '../domain/how_to_play_repository.dart';
 import '../domain/leaderboard_entry.dart';
 import '../domain/leaderboard_repository.dart';
 import '../domain/music_settings_repository.dart';
@@ -12,6 +13,7 @@ import '../domain/puzzle_engine.dart';
 import 'board_animation_bus.dart';
 import 'game_session_controller.dart';
 import 'game_session_state.dart';
+import 'how_to_play_controller.dart';
 import 'leaderboard_controller.dart';
 import 'music_settings_controller.dart';
 import 'player_nickname_controller.dart';
@@ -31,6 +33,10 @@ final musicSettingsRepositoryProvider = Provider<MusicSettingsRepository>((
   ref,
 ) {
   return InMemoryMusicSettingsRepository();
+});
+
+final howToPlayRepositoryProvider = Provider<HowToPlayRepository>((ref) {
+  return InMemoryHowToPlayRepository();
 });
 
 final leaderboardRepositoryProvider = Provider<LeaderboardRepository>((ref) {
@@ -66,6 +72,13 @@ final musicSettingsControllerProvider =
     StateNotifierProvider<MusicSettingsController, AsyncValue<bool>>((ref) {
       return MusicSettingsController(
         repository: ref.watch(musicSettingsRepositoryProvider),
+      );
+    });
+
+final howToPlayControllerProvider =
+    StateNotifierProvider<HowToPlayController, AsyncValue<bool>>((ref) {
+      return HowToPlayController(
+        repository: ref.watch(howToPlayRepositoryProvider),
       );
     });
 

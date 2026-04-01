@@ -126,6 +126,9 @@ class PuzzleBoardGame extends FlameGame {
           duration: event.duration,
         );
         return;
+      case BoardAnimationKind.gameOver:
+        _collapseBoard(duration: event.duration);
+        return;
     }
   }
 
@@ -233,6 +236,27 @@ class PuzzleBoardGame extends FlameGame {
           chainIndex: chainIndex,
           clearedPositions: clearedPositions,
         ),
+      );
+    }
+  }
+
+  void _collapseBoard({required Duration duration}) {
+    _callouts.clear();
+    _hint = null;
+    _hintElapsed = 0;
+
+    for (final visual in _visuals.values) {
+      final tumbleDirection = (visual.tile.id % 2 == 0) ? 1.0 : -1.0;
+      final sidewaysDrift =
+          (((visual.tile.id % 5) + 1) * 0.04) * tumbleDirection;
+      final dropDistance = 1.05 + (visual.row * 0.08);
+      visual.animateTo(
+        row: visual.row + dropDistance,
+        column: visual.column + sidewaysDrift,
+        duration: duration,
+        scale: 0.76,
+        opacity: 0,
+        removeWhenFinished: true,
       );
     }
   }

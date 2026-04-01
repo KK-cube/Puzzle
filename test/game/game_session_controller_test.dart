@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
@@ -155,6 +156,43 @@ void main() {
 
       async.elapse(const Duration(seconds: 1));
       expect(controller.state.activeHint, isNotNull);
+    });
+  });
+
+  test('no-move game over pauses on the board before the result screen', () {
+    fakeAsync((async) {
+      final controller = GameSessionController(
+        engine: _NoMoreMovesAfterClearEngine(clearedTiles: 3),
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations(
+          move: Duration.zero,
+          revert: Duration.zero,
+          clear: Duration.zero,
+          settle: Duration.zero,
+          gameOverHold: Duration(milliseconds: 900),
+          chainBannerHold: Duration.zero,
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      controller.startNewGame();
+      async.flushMicrotasks();
+
+      unawaited(controller.swapRows(0, 1));
+      async.elapse(Duration.zero);
+      async.flushMicrotasks();
+
+      expect(controller.state.phase, GamePhase.resolving);
+      expect(controller.state.runEndReason, RunEndReason.noMoreMoves);
+
+      async.elapse(const Duration(milliseconds: 850));
+      async.flushMicrotasks();
+      expect(controller.state.phase, GamePhase.resolving);
+
+      async.elapse(const Duration(milliseconds: 50));
+      async.flushMicrotasks();
+      expect(controller.state.phase, GamePhase.result);
     });
   });
 }
@@ -329,6 +367,18 @@ class _FakeClearEngine extends PuzzleEngine {
     required int remainingRotations,
   }) {
     return [MoveCommand.swapRows(0, 1)];
+  }
+}
+
+class _NoMoreMovesAfterClearEngine extends _FakeClearEngine {
+  _NoMoreMovesAfterClearEngine({required super.clearedTiles});
+
+  @override
+  List<MoveCommand> findAvailableMoves(
+    BoardMatrix board, {
+    required int remainingRotations,
+  }) {
+    return const [];
   }
 }
 

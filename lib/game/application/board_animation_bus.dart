@@ -2,7 +2,7 @@ import 'dart:async';
 
 import '../domain/models.dart';
 
-enum BoardAnimationKind { sync, transition, clear }
+enum BoardAnimationKind { sync, transition, clear, gameOver }
 
 class BoardAnimationEvent {
   const BoardAnimationEvent._({
@@ -50,6 +50,17 @@ class BoardAnimationEvent {
       clearedTileIds: clearedTileIds,
       clearedPositions: clearedPositions,
       chainIndex: chainIndex,
+    );
+  }
+
+  factory BoardAnimationEvent.gameOver(
+    BoardMatrix board, {
+    required Duration duration,
+  }) {
+    return BoardAnimationEvent._(
+      kind: BoardAnimationKind.gameOver,
+      board: cloneBoard(board),
+      duration: duration,
     );
   }
 

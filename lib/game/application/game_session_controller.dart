@@ -14,6 +14,7 @@ class GameSessionDurations {
     this.revert = const Duration(milliseconds: 180),
     this.clear = const Duration(milliseconds: 200),
     this.settle = const Duration(milliseconds: 260),
+    this.gameOverHold = const Duration(milliseconds: 1100),
     this.chainBannerHold = const Duration(milliseconds: 420),
     this.timerTick = const Duration(milliseconds: 100),
   });
@@ -23,6 +24,7 @@ class GameSessionDurations {
       revert = Duration.zero,
       clear = Duration.zero,
       settle = Duration.zero,
+      gameOverHold = Duration.zero,
       chainBannerHold = Duration.zero,
       timerTick = const Duration(milliseconds: 100);
 
@@ -30,6 +32,7 @@ class GameSessionDurations {
   final Duration revert;
   final Duration clear;
   final Duration settle;
+  final Duration gameOverHold;
   final Duration chainBannerHold;
   final Duration timerTick;
 }
@@ -371,12 +374,27 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   Future<void> _finishRun(int score, {required RunEndReason reason}) async {
     _stopCountdown();
     _resetHintTimer(clearHint: true);
+    final finalBoard = cloneBoard(state.board);
     state = state.copyWith(
       phase: GamePhase.resolving,
       inputLocked: true,
       remainingTimeMs: state.remainingTimeMs.clamp(0, kInitialRunTimeMs * 10),
+      activeHint: null,
+      selectedRotationCenter: null,
+      runEndReason: reason,
     );
-    final bestScore = await _highScoreRepository.saveIfHigher(score);
+    _animationBus.emit(
+      BoardAnimationEvent.gameOver(
+        finalBoard,
+        duration: durations.gameOverHold,
+      ),
+    );
+
+    final bestScoreFuture = _highScoreRepository.saveIfHigher(score);
+    if (durations.gameOverHold > Duration.zero) {
+      await Future<void>.delayed(durations.gameOverHold);
+    }
+    final bestScore = await bestScoreFuture;
     if (!mounted) {
       return;
     }

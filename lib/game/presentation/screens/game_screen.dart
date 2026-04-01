@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +19,8 @@ class GameScreen extends ConsumerWidget {
     final engine = ref.watch(puzzleEngineProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
     final backgroundMusic = ref.read(backgroundMusicControllerProvider);
+    final showGameOverOverlay =
+        state.phase == GamePhase.resolving && state.runEndReason != null;
     final availableMoves = state.hasBoard
         ? engine.findAvailableMoves(
             state.board,
@@ -39,85 +42,97 @@ class GameScreen extends ConsumerWidget {
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => unawaited(backgroundMusic.ensurePlaying()),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFEF3C7), Color(0xFFF2F7F1), Color(0xFFDDEBFF)],
-          ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact =
-                  constraints.maxWidth < 560 || constraints.maxHeight < 780;
-              if (compact) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
-                  child: Column(
-                    children: [
-                      const Align(
-                        alignment: Alignment.centerRight,
-                        child: MusicSettingsButton(compact: true),
-                      ),
-                      const SizedBox(height: 8),
-                      _HudSection(state: state, compact: true),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: PuzzleBoardStage(state: state),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _ControlPanel(
-                        state: state,
-                        compact: true,
-                        onRotateCounterClockwise: rotateCounterClockwise,
-                        onRotateClockwise: rotateClockwise,
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  children: [
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: MusicSettingsButton(),
-                    ),
-                    const SizedBox(height: 12),
-                    _HudSection(state: state, compact: false),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: 720,
-                            maxHeight: 720,
+      child: Stack(
+        children: [
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFEF3C7),
+                  Color(0xFFF2F7F1),
+                  Color(0xFFDDEBFF),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact =
+                      constraints.maxWidth < 560 || constraints.maxHeight < 780;
+                  if (compact) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+                      child: Column(
+                        children: [
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: MusicSettingsButton(compact: true),
                           ),
-                          child: PuzzleBoardStage(state: state),
-                        ),
+                          const SizedBox(height: 8),
+                          _HudSection(state: state, compact: true),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: AspectRatio(
+                              aspectRatio: 1,
+                              child: PuzzleBoardStage(state: state),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _ControlPanel(
+                            state: state,
+                            compact: true,
+                            onRotateCounterClockwise: rotateCounterClockwise,
+                            onRotateClockwise: rotateClockwise,
+                          ),
+                        ],
                       ),
+                    );
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      children: [
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: MusicSettingsButton(),
+                        ),
+                        const SizedBox(height: 12),
+                        _HudSection(state: state, compact: false),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: 720,
+                                maxHeight: 720,
+                              ),
+                              child: PuzzleBoardStage(state: state),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _ControlPanel(
+                          state: state,
+                          compact: false,
+                          onRotateCounterClockwise: rotateCounterClockwise,
+                          onRotateClockwise: rotateClockwise,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    _ControlPanel(
-                      state: state,
-                      compact: false,
-                      onRotateCounterClockwise: rotateCounterClockwise,
-                      onRotateClockwise: rotateClockwise,
-                    ),
-                  ],
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
-        ),
+          if (showGameOverOverlay)
+            Positioned.fill(
+              child: _GameOverOverlay(reason: state.runEndReason!),
+            ),
+        ],
       ),
     );
   }
@@ -149,13 +164,7 @@ class _HudSection extends StatelessWidget {
     if (compact) {
       return Row(
         children: [
-          Expanded(
-            child: _HudChip(
-              label: '得点',
-              value: '${state.score}',
-              compact: true,
-            ),
-          ),
+          Expanded(child: _ScoreHudChip(score: state.score, compact: true)),
           const SizedBox(width: 8),
           Expanded(
             child: _HudChip(
@@ -189,7 +198,7 @@ class _HudSection extends StatelessWidget {
       runSpacing: 12,
       alignment: WrapAlignment.center,
       children: [
-        _HudChip(label: '得点', value: '${state.score}'),
+        _ScoreHudChip(score: state.score),
         _HudChip(label: '最高', value: '${state.bestScore}'),
         _HudChip(
           label: '時間',
@@ -304,6 +313,216 @@ class _ControlPanel extends StatelessWidget {
       return '回転は詰まった時の切り札です。押すと必ず 3 マス以上そろう 3x3 回転だけが発動します。';
     }
     return 'まだ行・列の手があります。回転は行き詰まった時だけ使えます。';
+  }
+}
+
+class _ScoreHudChip extends StatefulWidget {
+  const _ScoreHudChip({required this.score, this.compact = false});
+
+  final int score;
+  final bool compact;
+
+  @override
+  State<_ScoreHudChip> createState() => _ScoreHudChipState();
+}
+
+class _ScoreHudChipState extends State<_ScoreHudChip> {
+  static const _burstDuration = Duration(milliseconds: 900);
+
+  Timer? _clearTimer;
+  int? _delta;
+  int _burstSeed = 0;
+
+  @override
+  void didUpdateWidget(covariant _ScoreHudChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final delta = widget.score - oldWidget.score;
+    if (delta <= 0) {
+      return;
+    }
+
+    _clearTimer?.cancel();
+    setState(() {
+      _delta = delta;
+      _burstSeed += 1;
+    });
+    _clearTimer = Timer(_burstDuration, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _delta = null;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _clearTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _HudChip(
+          label: '得点',
+          value: '${widget.score}',
+          compact: widget.compact,
+        ),
+        if (_delta != null)
+          Positioned(
+            top: widget.compact ? -16 : -20,
+            right: widget.compact ? 10 : 14,
+            child: _ScoreBurst(
+              key: ValueKey(_burstSeed),
+              delta: _delta!,
+              compact: widget.compact,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ScoreBurst extends StatelessWidget {
+  const _ScoreBurst({super.key, required this.delta, required this.compact});
+
+  final int delta;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 860),
+      curve: Curves.easeOutCubic,
+      tween: Tween(begin: 0, end: 1),
+      builder: (context, value, child) {
+        final opacity = value < 0.72 ? 1.0 : 1 - ((value - 0.72) / 0.28);
+        final lift = lerpDouble(12, -10, value) ?? 0;
+        final scale =
+            lerpDouble(0.88, 1.02, value.clamp(0.0, 0.45) / 0.45) ?? 1;
+        return Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, lift),
+            child: Transform.scale(scale: scale, child: child),
+          ),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 12,
+          vertical: compact ? 4 : 5,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF59E0B),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.28),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Text(
+          '+$delta',
+          style: TextStyle(
+            fontSize: compact ? 12 : 14,
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF172033),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GameOverOverlay extends StatelessWidget {
+  const _GameOverOverlay({required this.reason});
+
+  final RunEndReason reason;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = switch (reason) {
+      RunEndReason.timeUp => 'TIME UP',
+      RunEndReason.noMoreMoves => 'NO MOVES',
+    };
+    final subtitle = switch (reason) {
+      RunEndReason.timeUp => '残り時間が尽きました',
+      RunEndReason.noMoreMoves => '次の一手が見つかりません',
+    };
+
+    return IgnorePointer(
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 780),
+        curve: Curves.easeOutCubic,
+        tween: Tween(begin: 0, end: 1),
+        builder: (context, value, child) {
+          final opacity = value.clamp(0.0, 1.0);
+          final scale = lerpDouble(0.92, 1.0, value) ?? 1.0;
+          final slide = lerpDouble(24, 0, value) ?? 0;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withValues(alpha: opacity * 0.24),
+            ),
+            child: Center(
+              child: Opacity(
+                opacity: opacity,
+                child: Transform.translate(
+                  offset: Offset(0, slide),
+                  child: Transform.scale(scale: scale, child: child),
+                ),
+              ),
+            ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: const Color(0xFFE7ECF3)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.16),
+                blurRadius: 30,
+                offset: const Offset(0, 18),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
+                  color: Color(0xFF172033),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF556273),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
