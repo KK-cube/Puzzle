@@ -20,11 +20,11 @@ class BoardGeometry {
     18,
   );
   late final double touchHitSlop = clampDouble(cellSize * 0.28, 10, 18);
-  late final double rowSnapRadius = clampDouble(cellSize * 0.24, 10, 18);
+  late final double rowSnapRadius = clampDouble(cellSize * 0.32, 12, 22);
   late final double columnSnapRadius = clampDouble(cellSize * 0.38, 14, 24);
-  static const double _rowSnapBias = 1.0;
+  static const double _rowSnapBias = 1.18;
   static const double _columnSnapBias = 1.25;
-  static const double _rowSnapStrength = 0.42;
+  static const double _rowSnapStrength = 0.68;
   static const double _columnSnapStrength = 0.78;
   late final Offset origin = Offset(
     (_size.width - boardSize) / 2,

@@ -84,10 +84,10 @@ class HowToPlayDialog extends StatelessWidget {
                               accent: Color(0xFF0F766E),
                             ),
                             _HowToCard(
-                              icon: Icons.rotate_right_rounded,
-                              title: '3. 回転とフィーバー',
+                              icon: Icons.local_fire_department_rounded,
+                              title: '3. フィーバー',
                               body:
-                                  '左右回転は通常時でも使えます。残り 5 回までで、押すと必ず 3 マス以上そろう 3x3 回転だけが発動します。右下のゲージが満タンになると FEVER を押せます。',
+                                  'FEVER は初回 500pt、以降は 500pt ずつ必要値が増えます。右下のボタンから発動すると、7.5 秒間はどこを動かしてもそろいます。',
                               accent: Color(0xFF2563EB),
                             ),
                           ],
@@ -114,7 +114,7 @@ class HowToPlayDialog extends StatelessWidget {
                               ),
                               SizedBox(height: 10),
                               Text(
-                                '3つ消しで +0.5秒、4つ以上をまとめて消すと +1.0秒。連鎖ほどスコア倍率が大きく伸び、消去で FEVER ゲージもたまります。',
+                                '3つ消しで +0.5秒、4つ以上をまとめて消すと +1.0秒。連鎖ほどスコア倍率が大きく伸び、必要ポイントを満たして FEVER を押すと 7.5 秒間どこを動かしてもそろいます。',
                                 style: TextStyle(
                                   fontSize: 15,
                                   height: 1.5,

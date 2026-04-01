@@ -24,11 +24,28 @@ void main() {
       expect(geometry.nearestColumnForOffset(2, offset), 3);
     });
 
+    test('row drag prefers the nearby slot before the exact midpoint', () {
+      final geometry = BoardGeometry(const Size(420, 420));
+
+      final offset = geometry.cellSize * 0.43;
+      expect(geometry.nearestRowForOffset(2, offset), 3);
+    });
+
     test('column drag is pulled toward the target slot when close enough', () {
       final geometry = BoardGeometry(const Size(420, 420));
       final rawOffset = geometry.cellSize * 0.84;
 
       final snappedOffset = geometry.snappedColumnOffset(2, rawOffset);
+
+      expect(snappedOffset, greaterThan(rawOffset));
+      expect(snappedOffset, lessThanOrEqualTo(geometry.cellSize));
+    });
+
+    test('row drag is pulled toward the target slot when close enough', () {
+      final geometry = BoardGeometry(const Size(420, 420));
+      final rawOffset = geometry.cellSize * 0.79;
+
+      final snappedOffset = geometry.snappedRowOffset(2, rawOffset);
 
       expect(snappedOffset, greaterThan(rawOffset));
       expect(snappedOffset, lessThanOrEqualTo(geometry.cellSize));

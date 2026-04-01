@@ -22,7 +22,7 @@ class ResultScreen extends ConsumerWidget {
     };
     final subtitle = switch (state.runEndReason) {
       RunEndReason.timeUp => '残り時間が 0 になりました。すばやく連鎖して、消去ボーナスで時間を伸ばしましょう。',
-      _ => '盤面が安定し、入れ替えと回転で消せる手がなくなりました。',
+      _ => '盤面が安定し、入れ替えで消せる手がなくなりました。',
     };
 
     return DecoratedBox(

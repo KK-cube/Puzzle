@@ -27,6 +27,7 @@ class BoardInteractionOverlay extends ConsumerStatefulWidget {
 class _BoardInteractionOverlayState
     extends ConsumerState<BoardInteractionOverlay> {
   static const _touchFeedbackHold = Duration(milliseconds: 280);
+  static const _horizontalAxisBias = 1.12;
 
   _PendingDrag? _pendingDrag;
   _ActiveDrag? _activeDrag;
@@ -36,7 +37,7 @@ class _BoardInteractionOverlayState
   @override
   void didUpdateWidget(covariant BoardInteractionOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.state.inputLocked &&
+    if (widget.state.isInteractionLocked &&
         (_pendingDrag != null ||
             _activeDrag != null ||
             _touchFocusCell != null ||
@@ -62,23 +63,25 @@ class _BoardInteractionOverlayState
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: widget.state.inputLocked
+          onTapDown: widget.state.isInteractionLocked
               ? null
               : (details) => _handleTouchDown(details.localPosition, geometry),
           onTapCancel: _handleTapCancel,
-          onTapUp: widget.state.inputLocked
+          onTapUp: widget.state.isInteractionLocked
               ? null
               : (details) => _handleTap(details.localPosition, geometry),
-          onPanDown: widget.state.inputLocked
+          onPanDown: widget.state.isInteractionLocked
               ? null
               : (details) => _handleTouchDown(details.localPosition, geometry),
-          onPanStart: widget.state.inputLocked
+          onPanStart: widget.state.isInteractionLocked
               ? null
               : (details) => _handlePanStart(details.localPosition, geometry),
-          onPanUpdate: widget.state.inputLocked
+          onPanUpdate: widget.state.isInteractionLocked
               ? null
               : (details) => _handlePanUpdate(details.localPosition, geometry),
-          onPanEnd: widget.state.inputLocked ? null : (_) => _handlePanEnd(),
+          onPanEnd: widget.state.isInteractionLocked
+              ? null
+              : (_) => _handlePanEnd(),
           onPanCancel: _handlePanCancel,
           child: CustomPaint(
             painter: _InteractionPainter(
@@ -151,7 +154,10 @@ class _BoardInteractionOverlayState
         return;
       }
 
-      final axis = delta.dx.abs() >= delta.dy.abs()
+      final horizontalDistance = delta.dx.abs();
+      final verticalDistance = delta.dy.abs();
+      final axis =
+          horizontalDistance >= (verticalDistance * _horizontalAxisBias)
           ? BoardDragAxis.column
           : BoardDragAxis.row;
       final sourceIndex = axis == BoardDragAxis.column
@@ -454,7 +460,7 @@ class _InteractionPainter extends CustomPainter {
       );
     }
 
-    if (state.inputLocked) {
+    if (state.isInteractionLocked) {
       final lockPaint = Paint()..color = Colors.black.withValues(alpha: 0.08);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
@@ -472,7 +478,7 @@ class _InteractionPainter extends CustomPainter {
         oldDelegate.touchFocusCell != touchFocusCell ||
         oldDelegate.state.selectedRotationCenter !=
             state.selectedRotationCenter ||
-        oldDelegate.state.inputLocked != state.inputLocked;
+        oldDelegate.state.isInteractionLocked != state.isInteractionLocked;
   }
 
   Iterable<BoardPosition> _touchNeighbors(BoardPosition center) sync* {

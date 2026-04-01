@@ -13,6 +13,7 @@ import 'package:flutter_application_1/game/application/game_session_state.dart';
 import 'package:flutter_application_1/game/domain/high_score_repository.dart';
 import 'package:flutter_application_1/game/domain/how_to_play_repository.dart';
 import 'package:flutter_application_1/game/domain/leaderboard_repository.dart';
+import 'package:flutter_application_1/game/domain/models.dart';
 import 'package:flutter_application_1/game/domain/music_settings_repository.dart';
 import 'package:flutter_application_1/game/domain/player_nickname_repository.dart';
 import 'package:flutter_application_1/game/domain/puzzle_engine.dart';
@@ -66,9 +67,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('得点'), findsOneWidget);
-    expect(find.text('残り回転'), findsOneWidget);
-    expect(find.text('左回転'), findsOneWidget);
-    expect(find.text('右回転'), findsOneWidget);
+    expect(find.text('残り回転'), findsNothing);
+    expect(find.text('左回転'), findsNothing);
+    expect(find.text('右回転'), findsNothing);
   });
 
   testWidgets('game screen remains usable on a phone-sized viewport', (
@@ -110,21 +111,22 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('左回転'), findsOneWidget);
-    expect(find.text('右回転'), findsOneWidget);
-    expect(find.text('回転'), findsOneWidget);
+    expect(find.text('左回転'), findsNothing);
+    expect(find.text('右回転'), findsNothing);
+    expect(find.text('回転'), findsNothing);
     expect(find.text('FEVER'), findsOneWidget);
     expect(
-      find.text('回転は通常時でも使えます。押せる向きでは、必ず 3 マス以上そろう 3x3 回転だけが発動します。'),
-      findsOneWidget,
+      tester.getSize(find.byKey(const Key('fever_button'))).width,
+      lessThan(100),
     );
+    expect(find.text('牌を横に動かすと列、縦に動かすと行をスライドできます。'), findsOneWidget);
 
     final boardStageSize = tester.getSize(find.byType(PuzzleBoardStage));
     expect(boardStageSize.width, greaterThan(370));
     expect(boardStageSize.height, boardStageSize.width);
   });
 
-  testWidgets('how-to-play can be reopened from the game screen help button', (
+  testWidgets('help button pauses the game and reopens how-to-play', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1400, 2200);
@@ -132,25 +134,30 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    final container = ProviderContainer(
+      overrides: [
+        highScoreRepositoryProvider.overrideWithValue(
+          InMemoryHighScoreRepository(),
+        ),
+        backgroundMusicControllerProvider.overrideWithValue(
+          SilentBackgroundMusicController(),
+        ),
+        leaderboardRepositoryProvider.overrideWithValue(
+          InMemoryLeaderboardRepository(),
+        ),
+        howToPlayRepositoryProvider.overrideWithValue(
+          InMemoryHowToPlayRepository(true),
+        ),
+        playerNicknameRepositoryProvider.overrideWithValue(
+          InMemoryPlayerNicknameRepository('Tester'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          highScoreRepositoryProvider.overrideWithValue(
-            InMemoryHighScoreRepository(),
-          ),
-          backgroundMusicControllerProvider.overrideWithValue(
-            SilentBackgroundMusicController(),
-          ),
-          leaderboardRepositoryProvider.overrideWithValue(
-            InMemoryLeaderboardRepository(),
-          ),
-          howToPlayRepositoryProvider.overrideWithValue(
-            InMemoryHowToPlayRepository(true),
-          ),
-          playerNicknameRepositoryProvider.overrideWithValue(
-            InMemoryPlayerNicknameRepository('Tester'),
-          ),
-        ],
+      UncontrolledProviderScope(
+        container: container,
         child: const PuzzleLinesApp(),
       ),
     );
@@ -160,38 +167,56 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
+    final pausedTime = container
+        .read(gameSessionControllerProvider)
+        .remainingTimeMs;
+
     await tester.tap(find.byIcon(Icons.help_outline_rounded));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('遊び方'), findsOneWidget);
     expect(find.text('閉じる'), findsOneWidget);
+    expect(container.read(gameSessionControllerProvider).isPaused, isTrue);
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(
+      container.read(gameSessionControllerProvider).remainingTimeMs,
+      pausedTime,
+    );
+
+    await tester.tap(find.text('閉じる'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(container.read(gameSessionControllerProvider).isPaused, isFalse);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      container.read(gameSessionControllerProvider).remainingTimeMs,
+      lessThan(pausedTime),
+    );
+
+    container.read(gameSessionControllerProvider.notifier).returnToTitle();
+    await tester.pump();
   });
 
-  testWidgets('first start shows the how-to-play screen before the run', (
+  testWidgets('fever start shows a temporary announcement banner', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1400, 2200);
-    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = _FeverAnnouncementGameSessionController();
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          highScoreRepositoryProvider.overrideWithValue(
-            InMemoryHighScoreRepository(),
-          ),
+          gameSessionControllerProvider.overrideWith((ref) => controller),
           backgroundMusicControllerProvider.overrideWithValue(
             SilentBackgroundMusicController(),
-          ),
-          leaderboardRepositoryProvider.overrideWithValue(
-            InMemoryLeaderboardRepository(),
-          ),
-          howToPlayRepositoryProvider.overrideWithValue(
-            InMemoryHowToPlayRepository(false),
-          ),
-          playerNicknameRepositoryProvider.overrideWithValue(
-            InMemoryPlayerNicknameRepository('Tester'),
           ),
         ],
         child: const PuzzleLinesApp(),
@@ -199,18 +224,61 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.text('ゲーム開始'));
-    await tester.pumpAndSettle();
+    expect(find.text('FEVER TIME'), findsNothing);
 
-    expect(find.text('遊び方'), findsOneWidget);
-    expect(find.text('理解してスタート'), findsOneWidget);
-
-    await tester.tap(find.text('理解してスタート'));
+    controller.triggerFever();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
 
-    expect(find.text('得点'), findsOneWidget);
+    expect(find.text('FEVER TIME'), findsOneWidget);
+    expect(find.text('今なら どこを動かしても そろう!'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('FEVER TIME'), findsNothing);
   });
+
+  testWidgets(
+    'start begins immediately without showing the how-to-play screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(1400, 2200);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            highScoreRepositoryProvider.overrideWithValue(
+              InMemoryHighScoreRepository(),
+            ),
+            backgroundMusicControllerProvider.overrideWithValue(
+              SilentBackgroundMusicController(),
+            ),
+            leaderboardRepositoryProvider.overrideWithValue(
+              InMemoryLeaderboardRepository(),
+            ),
+            howToPlayRepositoryProvider.overrideWithValue(
+              InMemoryHowToPlayRepository(false),
+            ),
+            playerNicknameRepositoryProvider.overrideWithValue(
+              InMemoryPlayerNicknameRepository('Tester'),
+            ),
+          ],
+          child: const PuzzleLinesApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('ゲーム開始'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('得点'), findsOneWidget);
+      expect(find.text('遊び方'), findsNothing);
+    },
+  );
 
   testWidgets('start prompts for nickname when none is saved', (tester) async {
     tester.view.physicalSize = const Size(1400, 2200);
@@ -386,5 +454,42 @@ class _ResultGameSessionController extends GameSessionController {
       chainBanner: null,
       runEndReason: RunEndReason.timeUp,
     );
+  }
+}
+
+class _FeverAnnouncementGameSessionController extends GameSessionController {
+  _FeverAnnouncementGameSessionController()
+    : super(
+        engine: PuzzleEngine(random: Random(11)),
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations.instant(),
+      ) {
+    final board = PuzzleEngine(
+      random: Random(12),
+    ).createInitialBoard(remainingRotations: kInitialRotationCharges);
+    state = state.copyWith(
+      phase: GamePhase.playing,
+      board: board,
+      score: 0,
+      bestScore: 0,
+      lastRunScore: 0,
+      currentChain: 0,
+      remainingRotations: kInitialRotationCharges,
+      remainingTimeMs: kInitialRunTimeMs,
+      feverGauge: 0,
+      feverChargeGoal: kInitialFeverChargeGoal,
+      feverRemainingMs: 0,
+      activeHint: null,
+      selectedRotationCenter: null,
+      isPaused: false,
+      inputLocked: false,
+      chainBanner: null,
+      runEndReason: null,
+    );
+  }
+
+  void triggerFever() {
+    state = state.copyWith(feverRemainingMs: kFeverDurationMs);
   }
 }

@@ -12,91 +12,84 @@ import 'package:flutter_application_1/game/domain/models.dart';
 import 'package:flutter_application_1/game/domain/puzzle_engine.dart';
 
 void main() {
-  test(
-    'rotations consume charges until they run out even during normal play',
-    () async {
-      final engine = _FakeRotationEngine();
-      final controller = GameSessionController(
-        engine: engine,
-        highScoreRepository: InMemoryHighScoreRepository(),
-        animationBus: BoardAnimationBus(),
-        durations: const GameSessionDurations.instant(),
-      );
-      addTearDown(controller.dispose);
+  test('runs start with player rotations disabled', () async {
+    final engine = _FakeRotationEngine();
+    final controller = GameSessionController(
+      engine: engine,
+      highScoreRepository: InMemoryHighScoreRepository(),
+      animationBus: BoardAnimationBus(),
+      durations: const GameSessionDurations.instant(),
+    );
+    addTearDown(controller.dispose);
 
-      controller.startNewGame();
+    controller.startNewGame();
 
-      for (
-        var expectedRemaining = kInitialRotationCharges - 1;
-        expectedRemaining >= 0;
-        expectedRemaining--
-      ) {
-        await controller.rotateSelection(RotationDirection.clockwise);
-        expect(controller.state.remainingRotations, expectedRemaining);
-      }
+    expect(controller.state.remainingRotations, 0);
 
-      expect(controller.state.selectedRotationCenter, isNull);
+    await controller.rotateSelection(RotationDirection.clockwise);
 
-      await controller.rotateSelection(RotationDirection.clockwise);
-      expect(controller.state.remainingRotations, 0);
-      expect(engine.applyMoveCalls, kInitialRotationCharges);
-    },
-  );
-
-  test(
-    'rotation does not consume a charge when no valid rotation move exists',
-    () async {
-      final engine = _FakeRotationEngine(validRotations: 0);
-      final controller = GameSessionController(
-        engine: engine,
-        highScoreRepository: InMemoryHighScoreRepository(),
-        animationBus: BoardAnimationBus(),
-        durations: const GameSessionDurations.instant(),
-      );
-      addTearDown(controller.dispose);
-
-      controller.startNewGame();
-      await controller.rotateSelection(RotationDirection.clockwise);
-
-      expect(controller.state.remainingRotations, kInitialRotationCharges);
-      expect(controller.state.phase, GamePhase.playing);
-      expect(engine.applyMoveCalls, 0);
-    },
-  );
-
-  test('clears build the fever gauge and fever lasts for 5 seconds', () {
-    fakeAsync((async) {
-      final controller = GameSessionController(
-        engine: _FakeClearEngine(clearedTiles: 3),
-        highScoreRepository: InMemoryHighScoreRepository(),
-        animationBus: BoardAnimationBus(),
-        durations: const GameSessionDurations.instant(),
-      );
-      addTearDown(controller.dispose);
-
-      controller.startNewGame();
-      async.flushMicrotasks();
-
-      for (var index = 0; index < 5; index++) {
-        unawaited(controller.swapRows(0, 1));
-        async.elapse(Duration.zero);
-        async.flushMicrotasks();
-      }
-
-      expect(controller.state.feverGauge, kFeverGaugeMax);
-      expect(controller.state.canActivateFever, isTrue);
-
-      controller.activateFever();
-      expect(controller.state.isFeverActive, isTrue);
-      expect(controller.state.feverGauge, 0);
-      expect(controller.state.feverRemainingMs, kFeverDurationMs);
-
-      async.elapse(const Duration(seconds: 5));
-      async.flushMicrotasks();
-      expect(controller.state.isFeverActive, isFalse);
-      expect(controller.state.feverRemainingMs, 0);
-    });
+    expect(controller.state.remainingRotations, 0);
+    expect(controller.state.phase, GamePhase.playing);
+    expect(controller.state.selectedRotationCenter, isNull);
+    expect(engine.applyMoveCalls, 0);
   });
+
+  test(
+    'fever unlock cost steps up by 500 points and lasts for 7.5 seconds',
+    () {
+      fakeAsync((async) {
+        final controller = GameSessionController(
+          engine: _FakeClearEngine(clearedTiles: 3, scoreDelta: 250),
+          highScoreRepository: InMemoryHighScoreRepository(),
+          animationBus: BoardAnimationBus(),
+          durations: const GameSessionDurations.instant(),
+        );
+        addTearDown(controller.dispose);
+
+        controller.startNewGame();
+        async.flushMicrotasks();
+
+        expect(controller.state.feverChargeGoal, kInitialFeverChargeGoal);
+
+        for (var index = 0; index < 2; index++) {
+          unawaited(controller.swapRows(0, 1));
+          async.elapse(Duration.zero);
+          async.flushMicrotasks();
+        }
+
+        expect(controller.state.feverGauge, 500);
+        expect(controller.state.canActivateFever, isTrue);
+
+        controller.activateFever();
+        expect(controller.state.isFeverActive, isTrue);
+        expect(controller.state.feverGauge, 0);
+        expect(
+          controller.state.feverChargeGoal,
+          kInitialFeverChargeGoal + kFeverChargeGoalStep,
+        );
+        expect(controller.state.feverRemainingMs, kFeverDurationMs);
+
+        async.elapse(const Duration(milliseconds: 7400));
+        async.flushMicrotasks();
+        expect(controller.state.isFeverActive, isTrue);
+
+        async.elapse(const Duration(milliseconds: 100));
+        async.flushMicrotasks();
+        expect(controller.state.isFeverActive, isFalse);
+        expect(controller.state.feverRemainingMs, 0);
+
+        for (var index = 0; index < 4; index++) {
+          unawaited(controller.swapRows(0, 1));
+          async.elapse(Duration.zero);
+          async.flushMicrotasks();
+        }
+
+        expect(controller.state.feverGauge, 1000);
+        expect(controller.state.feverChargeGoal, 1000);
+        expect(controller.state.canActivateFever, isTrue);
+      });
+    },
+  );
 
   test('run starts at 30 seconds and ends when the timer reaches zero', () {
     fakeAsync((async) {
@@ -122,6 +115,36 @@ void main() {
       expect(controller.state.remainingTimeMs, 0);
       expect(controller.state.phase, GamePhase.result);
       expect(controller.state.runEndReason, RunEndReason.timeUp);
+    });
+  });
+
+  test('pausing the game stops the timer until it is resumed', () {
+    fakeAsync((async) {
+      final controller = GameSessionController(
+        engine: _FakeClearEngine(clearedTiles: 3),
+        highScoreRepository: InMemoryHighScoreRepository(),
+        animationBus: BoardAnimationBus(),
+        durations: const GameSessionDurations.instant(),
+      );
+      addTearDown(controller.dispose);
+
+      controller.startNewGame();
+      async.flushMicrotasks();
+
+      async.elapse(const Duration(seconds: 1));
+      expect(controller.state.remainingTimeMs, 29000);
+
+      expect(controller.pauseGame(), isTrue);
+      expect(controller.state.isPaused, isTrue);
+
+      async.elapse(const Duration(seconds: 5));
+      expect(controller.state.remainingTimeMs, 29000);
+
+      controller.resumeGame();
+      expect(controller.state.isPaused, isFalse);
+
+      async.elapse(const Duration(seconds: 1));
+      expect(controller.state.remainingTimeMs, 28000);
     });
   });
 
@@ -333,9 +356,11 @@ class _FakeRotationEngine extends PuzzleEngine {
 }
 
 class _FakeClearEngine extends PuzzleEngine {
-  _FakeClearEngine({required this.clearedTiles}) : super(random: Random(2));
+  _FakeClearEngine({required this.clearedTiles, this.scoreDelta = 30})
+    : super(random: Random(2));
 
   final int clearedTiles;
+  final int scoreDelta;
   final BoardMatrix _board = _boardFromRows(const [
     'ABCDEAB',
     'BCDEABC',
@@ -396,10 +421,10 @@ class _FakeClearEngine extends PuzzleEngine {
             for (var index = 0; index < clearedTiles; index++)
               snapshot[0][index].id,
           },
-          scoreDelta: 30,
+          scoreDelta: scoreDelta,
         ),
       ],
-      totalScore: 30,
+      totalScore: scoreDelta,
       totalChains: 1,
       consumesRotation: false,
     );

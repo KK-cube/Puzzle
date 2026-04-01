@@ -68,21 +68,21 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   void startNewGame() {
     _stopCountdown();
-    final board = _engine.createInitialBoard(
-      remainingRotations: kInitialRotationCharges,
-    );
+    final board = _engine.createInitialBoard(remainingRotations: 0);
     state = state.copyWith(
       phase: GamePhase.playing,
       board: board,
       score: 0,
       lastRunScore: 0,
       currentChain: 0,
-      remainingRotations: kInitialRotationCharges,
+      remainingRotations: 0,
       remainingTimeMs: kInitialRunTimeMs,
       feverGauge: 0,
+      feverChargeGoal: kInitialFeverChargeGoal,
       feverRemainingMs: 0,
       activeHint: null,
       selectedRotationCenter: null,
+      isPaused: false,
       inputLocked: false,
       chainBanner: null,
       runEndReason: null,
@@ -97,7 +97,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     state = state.copyWith(
       phase: GamePhase.title,
       feverGauge: 0,
+      feverChargeGoal: kInitialFeverChargeGoal,
       feverRemainingMs: 0,
+      remainingRotations: 0,
+      isPaused: false,
       inputLocked: false,
       chainBanner: null,
       selectedRotationCenter: null,
@@ -108,7 +111,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   void noteInteraction() {
-    if (state.phase != GamePhase.playing) {
+    if (state.phase != GamePhase.playing || state.isPaused) {
       return;
     }
 
@@ -116,7 +119,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   void selectRotationCenter(BoardPosition center) {
-    if (state.inputLocked || state.phase != GamePhase.playing) {
+    if (state.isInteractionLocked || state.phase != GamePhase.playing) {
       return;
     }
 
@@ -153,7 +156,9 @@ class GameSessionController extends StateNotifier<GameSessionState> {
   }
 
   Future<void> rotateSelection(RotationDirection direction) async {
-    if (state.remainingRotations <= 0 || !state.hasBoard) {
+    if (state.isInteractionLocked ||
+        state.remainingRotations <= 0 ||
+        !state.hasBoard) {
       return;
     }
 
@@ -167,7 +172,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   void activateFever() {
     if (state.phase != GamePhase.playing ||
-        state.inputLocked ||
+        state.isInteractionLocked ||
         !state.canActivateFever) {
       return;
     }
@@ -175,14 +180,34 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     _resetHintTimer(clearHint: true);
     state = state.copyWith(
       feverGauge: 0,
+      feverChargeGoal: state.feverChargeGoal + kFeverChargeGoalStep,
       feverRemainingMs: kFeverDurationMs,
       activeHint: null,
     );
   }
 
-  Future<void> _runMove(MoveCommand move) async {
+  bool pauseGame() {
     if (state.phase != GamePhase.playing ||
         state.inputLocked ||
+        state.isPaused) {
+      return false;
+    }
+
+    state = state.copyWith(isPaused: true);
+    return true;
+  }
+
+  void resumeGame() {
+    if (state.phase != GamePhase.playing || !state.isPaused) {
+      return;
+    }
+
+    state = state.copyWith(isPaused: false);
+  }
+
+  Future<void> _runMove(MoveCommand move) async {
+    if (state.phase != GamePhase.playing ||
+        state.isInteractionLocked ||
         !state.hasBoard) {
       return;
     }
@@ -203,6 +228,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
     state = state.copyWith(
       phase: GamePhase.resolving,
+      isPaused: false,
       inputLocked: true,
       currentChain: 0,
     );
@@ -235,11 +261,16 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       if (move.type == MoveType.rotate3x3 && state.remainingRotations <= 0) {
         state = state.copyWith(
           phase: GamePhase.playing,
+          isPaused: false,
           inputLocked: false,
           selectedRotationCenter: null,
         );
       } else {
-        state = state.copyWith(phase: GamePhase.playing, inputLocked: false);
+        state = state.copyWith(
+          phase: GamePhase.playing,
+          isPaused: false,
+          inputLocked: false,
+        );
       }
       return;
     }
@@ -277,10 +308,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
       nextScore += wave.scoreDelta;
       final timeBonusMs = _timeBonusForClearedTiles(wave.clearedTileIds.length);
-      final feverGaugeGain = _feverGaugeGainForWave(
-        wave.clearedTileIds.length,
-        wave.chainIndex,
-      );
+      final feverGaugeGain = _feverGaugeGainForWave(wave.scoreDelta);
       if (!mounted) {
         return;
       }
@@ -292,7 +320,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
         remainingTimeMs: state.remainingTimeMs + timeBonusMs,
         feverGauge: state.isFeverActive
             ? state.feverGauge
-            : (state.feverGauge + feverGaugeGain).clamp(0, kFeverGaugeMax),
+            : (state.feverGauge + feverGaugeGain).clamp(
+                0,
+                state.feverChargeGoal,
+              ),
         activeHint: null,
       );
       _animationBus.emit(
@@ -321,6 +352,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
     state = state.copyWith(
       phase: GamePhase.playing,
+      isPaused: false,
       inputLocked: false,
       currentChain: 0,
       activeHint: null,
@@ -342,6 +374,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
 
   void _tickTimer() {
     if (!mounted ||
+        state.isPaused ||
         (state.phase != GamePhase.playing &&
             state.phase != GamePhase.resolving)) {
       return;
@@ -365,7 +398,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       final feverJustEnded = nextFeverRemaining == 0;
       if (feverJustEnded &&
           state.phase == GamePhase.playing &&
-          !state.inputLocked &&
+          !state.isInteractionLocked &&
           state.hasBoard) {
         final availableMoves = _engine.findAvailableMoves(
           state.board,
@@ -378,7 +411,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       }
     }
 
-    if (state.phase != GamePhase.playing || state.inputLocked) {
+    if (state.phase != GamePhase.playing || state.isInteractionLocked) {
       return;
     }
 
@@ -433,9 +466,8 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     return 0;
   }
 
-  int _feverGaugeGainForWave(int clearedTiles, int chainIndex) {
-    final chainBonus = chainIndex <= 1 ? 0 : (chainIndex - 1) * 18;
-    return (clearedTiles * 8) + chainBonus;
+  int _feverGaugeGainForWave(int scoreDelta) {
+    return scoreDelta;
   }
 
   Future<void> _finishRun(int score, {required RunEndReason reason}) async {
@@ -444,8 +476,10 @@ class GameSessionController extends StateNotifier<GameSessionState> {
     final finalBoard = cloneBoard(state.board);
     state = state.copyWith(
       phase: GamePhase.resolving,
+      isPaused: false,
       inputLocked: true,
       remainingTimeMs: state.remainingTimeMs.clamp(0, kInitialRunTimeMs * 10),
+      feverChargeGoal: state.feverChargeGoal,
       feverRemainingMs: 0,
       activeHint: null,
       selectedRotationCenter: null,
@@ -471,6 +505,7 @@ class GameSessionController extends StateNotifier<GameSessionState> {
       phase: GamePhase.result,
       lastRunScore: score,
       bestScore: bestScore,
+      isPaused: false,
       inputLocked: false,
       currentChain: 0,
       remainingTimeMs: state.remainingTimeMs,

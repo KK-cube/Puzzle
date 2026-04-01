@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/game_providers.dart';
-import '../../application/how_to_play_controller.dart';
 import '../../application/player_nickname_controller.dart';
 import '../widgets/how_to_play_dialog.dart';
 import '../widgets/leaderboard_panel.dart';
@@ -19,9 +18,7 @@ class TitleScreen extends ConsumerWidget {
     final nickname = ref.watch(playerNicknameControllerProvider);
     final playerCount = ref.watch(playerCountControllerProvider);
     final leaderboardEnabled = ref.watch(leaderboardEnabledProvider);
-    final seenHowToPlay = ref.watch(howToPlayControllerProvider);
     final controller = ref.read(gameSessionControllerProvider.notifier);
-    final howToPlayController = ref.read(howToPlayControllerProvider.notifier);
     final nicknameController = ref.read(
       playerNicknameControllerProvider.notifier,
     );
@@ -40,15 +37,6 @@ class TitleScreen extends ConsumerWidget {
         return;
       }
 
-      final shouldStart = await _showHowToPlayIfNeeded(
-        context,
-        seenHowToPlay.valueOrNull == true,
-        howToPlayController,
-      );
-      if (!context.mounted || !shouldStart) {
-        return;
-      }
-
       controller.startNewGame();
       unawaited(backgroundMusic.ensurePlaying());
     }
@@ -62,8 +50,7 @@ class TitleScreen extends ConsumerWidget {
     }
 
     Future<void> handleHowToPlay() async {
-      await _showHowToPlayDialog(context, showStartButton: false);
-      await howToPlayController.markSeen();
+      await _showHowToPlayDialog(context);
     }
 
     return DecoratedBox(
@@ -164,7 +151,6 @@ class TitleScreen extends ConsumerWidget {
                         const SizedBox(height: 22),
                         _StartRunPanel(
                           nickname: nickname,
-                          seenHowToPlay: seenHowToPlay,
                           playerCount: playerCount,
                           leaderboardEnabled: leaderboardEnabled,
                           onPressed: handleStart,
@@ -189,7 +175,7 @@ class TitleScreen extends ConsumerWidget {
                             ),
                             const _InfoCard(label: '時間', value: '30秒'),
                             const _InfoCard(label: '盤面', value: '7 x 7'),
-                            const _InfoCard(label: '回転', value: '5回まで'),
+                            const _InfoCard(label: 'FEVER', value: '500pt〜'),
                           ],
                         ),
                         const SizedBox(height: 22),
@@ -201,7 +187,7 @@ class TitleScreen extends ConsumerWidget {
                         const LeaderboardPanel(),
                         const SizedBox(height: 18),
                         const Text(
-                          '3つ消すと +0.5秒、1回の消去で 4つ以上消すと +1秒。連鎖ほど得点倍率が大きく伸び、右下の FEVER ゲージが満タンになると 5 秒間のフィーバーを発動できます。',
+                          '3つ消すと +0.5秒、1回の消去で 4つ以上消すと +1秒。連鎖ほど得点倍率が大きく伸び、FEVER は初回 500pt、以降は 500pt ずつ必要値が増えます。発動すると 7.5 秒間フィーバーです。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
@@ -288,35 +274,11 @@ class TitleScreen extends ConsumerWidget {
     return result;
   }
 
-  Future<bool> _showHowToPlayIfNeeded(
-    BuildContext context,
-    bool hasSeenHowToPlay,
-    HowToPlayController howToPlayController,
-  ) async {
-    if (hasSeenHowToPlay) {
-      return true;
-    }
-
-    final confirmed = await _showHowToPlayDialog(
-      context,
-      showStartButton: true,
-    );
-    if (confirmed == true) {
-      await howToPlayController.markSeen();
-      return true;
-    }
-    return false;
-  }
-
-  Future<bool?> _showHowToPlayDialog(
-    BuildContext context, {
-    required bool showStartButton,
-  }) {
-    return showDialog<bool>(
+  Future<void> _showHowToPlayDialog(BuildContext context) {
+    return showDialog<void>(
       context: context,
-      barrierDismissible: !showStartButton,
       useSafeArea: false,
-      builder: (_) => HowToPlayDialog(showStartButton: showStartButton),
+      builder: (_) => const HowToPlayDialog(showStartButton: false),
     );
   }
 }
@@ -324,14 +286,12 @@ class TitleScreen extends ConsumerWidget {
 class _StartRunPanel extends StatelessWidget {
   const _StartRunPanel({
     required this.nickname,
-    required this.seenHowToPlay,
     required this.playerCount,
     required this.leaderboardEnabled,
     required this.onPressed,
   });
 
   final AsyncValue<String?> nickname;
-  final AsyncValue<bool> seenHowToPlay;
   final AsyncValue<int> playerCount;
   final bool leaderboardEnabled;
   final Future<void> Function() onPressed;
@@ -358,9 +318,7 @@ class _StartRunPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FilledButton.icon(
-            onPressed: nickname.isLoading || seenHowToPlay.isLoading
-                ? null
-                : onPressed,
+            onPressed: nickname.isLoading ? null : onPressed,
             icon: const Icon(Icons.play_arrow_rounded),
             label: Text(hasNickname ? 'ゲーム開始' : '名前を決めて開始'),
             style: FilledButton.styleFrom(
