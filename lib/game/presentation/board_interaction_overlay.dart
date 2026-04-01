@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,20 +26,28 @@ class BoardInteractionOverlay extends ConsumerStatefulWidget {
 
 class _BoardInteractionOverlayState
     extends ConsumerState<BoardInteractionOverlay> {
+  static const _touchFeedbackHold = Duration(milliseconds: 280);
+
   _PendingDrag? _pendingDrag;
   _ActiveDrag? _activeDrag;
+  BoardPosition? _touchFocusCell;
+  Timer? _touchFocusTimer;
 
   @override
   void didUpdateWidget(covariant BoardInteractionOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.state.inputLocked &&
-        (_pendingDrag != null || _activeDrag != null)) {
-      _clearDragState();
+        (_pendingDrag != null ||
+            _activeDrag != null ||
+            _touchFocusCell != null ||
+            widget.dragPreview.value != null)) {
+      _clearDragState(clearTouchFocus: true);
     }
   }
 
   @override
   void dispose() {
+    _touchFocusTimer?.cancel();
     widget.dragPreview.value = null;
     super.dispose();
   }
@@ -52,9 +62,16 @@ class _BoardInteractionOverlayState
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
+          onTapDown: widget.state.inputLocked
+              ? null
+              : (details) => _handleTouchDown(details.localPosition, geometry),
+          onTapCancel: _handleTapCancel,
           onTapUp: widget.state.inputLocked
               ? null
               : (details) => _handleTap(details.localPosition, geometry),
+          onPanDown: widget.state.inputLocked
+              ? null
+              : (details) => _handleTouchDown(details.localPosition, geometry),
           onPanStart: widget.state.inputLocked
               ? null
               : (details) => _handlePanStart(details.localPosition, geometry),
@@ -62,17 +79,36 @@ class _BoardInteractionOverlayState
               ? null
               : (details) => _handlePanUpdate(details.localPosition, geometry),
           onPanEnd: widget.state.inputLocked ? null : (_) => _handlePanEnd(),
-          onPanCancel: _clearDragState,
+          onPanCancel: _handlePanCancel,
           child: CustomPaint(
             painter: _InteractionPainter(
               geometry: geometry,
               state: widget.state,
               dragPreview: widget.dragPreview.value,
+              touchFocusCell: _touchFocusCell,
             ),
           ),
         );
       },
     );
+  }
+
+  void _handleTouchDown(Offset position, BoardGeometry geometry) {
+    final cell = geometry.cellAt(position);
+    if (cell == null) {
+      _clearTouchFocus();
+      return;
+    }
+
+    _setTouchFocus(cell);
+  }
+
+  void _handleTapCancel() {
+    if (_pendingDrag != null || _activeDrag != null) {
+      return;
+    }
+
+    _scheduleTouchFocusClear();
   }
 
   void _handleTap(Offset position, BoardGeometry geometry) {
@@ -88,6 +124,8 @@ class _BoardInteractionOverlayState
     final controller = ref.read(gameSessionControllerProvider.notifier);
     controller.noteInteraction();
     controller.clearRotationSelection();
+    _setTouchFocus(cell);
+    _scheduleTouchFocusClear();
   }
 
   void _handlePanStart(Offset position, BoardGeometry geometry) {
@@ -97,6 +135,7 @@ class _BoardInteractionOverlayState
     }
 
     ref.read(gameSessionControllerProvider.notifier).noteInteraction();
+    _setTouchFocus(cell);
 
     setState(() {
       _pendingDrag = _PendingDrag(originCell: cell, startPosition: position);
@@ -167,6 +206,7 @@ class _BoardInteractionOverlayState
   void _handlePanEnd() {
     final activeDrag = _activeDrag;
     _clearDragState();
+    _scheduleTouchFocusClear();
 
     if (activeDrag == null ||
         activeDrag.sourceIndex == activeDrag.targetIndex) {
@@ -181,17 +221,62 @@ class _BoardInteractionOverlayState
     }
   }
 
-  void _clearDragState() {
-    if (_pendingDrag == null &&
-        _activeDrag == null &&
-        widget.dragPreview.value == null) {
+  void _handlePanCancel() {
+    _clearDragState(clearTouchFocus: true);
+  }
+
+  void _setTouchFocus(BoardPosition cell) {
+    _touchFocusTimer?.cancel();
+    _touchFocusTimer = null;
+    if (_touchFocusCell == cell) {
       return;
     }
 
+    setState(() {
+      _touchFocusCell = cell;
+    });
+  }
+
+  void _scheduleTouchFocusClear() {
+    if (_touchFocusCell == null) {
+      return;
+    }
+
+    _touchFocusTimer?.cancel();
+    _touchFocusTimer = Timer(_touchFeedbackHold, _clearTouchFocus);
+  }
+
+  void _clearTouchFocus() {
+    _touchFocusTimer?.cancel();
+    _touchFocusTimer = null;
+    if (_touchFocusCell == null) {
+      return;
+    }
+
+    setState(() {
+      _touchFocusCell = null;
+    });
+  }
+
+  void _clearDragState({bool clearTouchFocus = false}) {
+    if (_pendingDrag == null &&
+        _activeDrag == null &&
+        widget.dragPreview.value == null &&
+        (!clearTouchFocus || _touchFocusCell == null)) {
+      return;
+    }
+
+    if (clearTouchFocus) {
+      _touchFocusTimer?.cancel();
+      _touchFocusTimer = null;
+    }
     widget.dragPreview.value = null;
     setState(() {
       _pendingDrag = null;
       _activeDrag = null;
+      if (clearTouchFocus) {
+        _touchFocusCell = null;
+      }
     });
   }
 }
@@ -234,11 +319,13 @@ class _InteractionPainter extends CustomPainter {
     required this.geometry,
     required this.state,
     required this.dragPreview,
+    required this.touchFocusCell,
   });
 
   final BoardGeometry geometry;
   final GameSessionState state;
   final BoardDragPreview? dragPreview;
+  final BoardPosition? touchFocusCell;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -254,6 +341,22 @@ class _InteractionPainter extends CustomPainter {
       ..strokeWidth = 3;
     final activeStrokePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.44)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+    final touchConnectorPaint = Paint()
+      ..color = const Color(0xFFFDE68A).withValues(alpha: 0.24)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = geometry.cellSize * 0.14
+      ..strokeCap = StrokeCap.round;
+    final touchNeighborPaint = Paint()
+      ..color = const Color(0xFFFDE68A).withValues(alpha: 0.18);
+    final touchCenterGlowPaint = Paint()
+      ..color = const Color(0xFFF59E0B).withValues(alpha: 0.22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    final touchCenterPaint = Paint()
+      ..color = const Color(0xFFFFF7D6).withValues(alpha: 0.24);
+    final touchCenterStrokePaint = Paint()
+      ..color = const Color(0xFFFFFBEB).withValues(alpha: 0.84)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
 
@@ -293,6 +396,49 @@ class _InteractionPainter extends CustomPainter {
       );
     }
 
+    final touchFocus = touchFocusCell;
+    if (touchFocus != null) {
+      final centerRect = geometry
+          .cellRect(touchFocus.row, touchFocus.column)
+          .deflate(8);
+      final centerPoint = geometry
+          .cellRect(touchFocus.row, touchFocus.column)
+          .center;
+
+      for (final neighbor in _touchNeighbors(touchFocus)) {
+        final neighborPoint = geometry
+            .cellRect(neighbor.row, neighbor.column)
+            .center;
+        canvas.drawLine(centerPoint, neighborPoint, touchConnectorPaint);
+      }
+
+      for (final neighbor in _touchNeighbors(touchFocus)) {
+        final neighborRect = geometry
+            .cellRect(neighbor.row, neighbor.column)
+            .deflate(10);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(neighborRect, const Radius.circular(16)),
+          touchNeighborPaint,
+        );
+      }
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          centerRect.inflate(4),
+          const Radius.circular(18),
+        ),
+        touchCenterGlowPaint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(centerRect, const Radius.circular(16)),
+        touchCenterPaint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(centerRect, const Radius.circular(16)),
+        touchCenterStrokePaint,
+      );
+    }
+
     final center = state.selectedRotationCenter;
     if (center != null) {
       final topLeft = geometry
@@ -323,8 +469,23 @@ class _InteractionPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _InteractionPainter oldDelegate) {
     return oldDelegate.dragPreview != dragPreview ||
+        oldDelegate.touchFocusCell != touchFocusCell ||
         oldDelegate.state.selectedRotationCenter !=
             state.selectedRotationCenter ||
         oldDelegate.state.inputLocked != state.inputLocked;
+  }
+
+  Iterable<BoardPosition> _touchNeighbors(BoardPosition center) sync* {
+    const offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+
+    for (final (rowOffset, columnOffset) in offsets) {
+      final row = center.row + rowOffset;
+      final column = center.column + columnOffset;
+      if (row < 0 || row >= kBoardSize || column < 0 || column >= kBoardSize) {
+        continue;
+      }
+
+      yield BoardPosition(row, column);
+    }
   }
 }
